@@ -1,0 +1,231 @@
+<script>
+// ============================================================================
+// KHỐI SCRIPT_UI: ĐIỀU HƯỚNG GIAO DIỆN VÀ TƯƠNG TÁC ÂM THANH
+// ============================================================================
+
+// 1. Quản lý trạng thái giao diện và Bàn phím Toán học
+let isKeypadVisible = true;
+let lockOSKeyboardOnTouch = true;
+let currentLevel = 1;
+
+function toggleMathKeypad(forceShow) {
+  const keypadEl = document.getElementById('custom-math-keypad');
+  const floatingBtn = document.getElementById('floating-keypad-Restore');
+  const lblToggle = document.getElementById('lbl-toggle-keypad');
+  const inLesson = !document.getElementById('view-lesson').classList.contains('hidden');
+
+  if (forceShow !== undefined) {
+    isKeypadVisible = forceShow;
+  } else {
+    isKeypadVisible = !isKeypadVisible;
+  }
+
+  if (isKeypadVisible && inLesson) {
+    keypadEl.classList.remove('hidden');
+    if (floatingBtn) floatingBtn.classList.add('hidden');
+    if (lblToggle) lblToggle.innerText = 'Ẩn bàn phím';
+  } else {
+    keypadEl.classList.add('hidden');
+    if (inLesson && floatingBtn) floatingBtn.classList.remove('hidden');
+    else if (floatingBtn) floatingBtn.classList.add('hidden');
+    if (lblToggle) lblToggle.innerText = 'Bàn phím số';
+  }
+  applyTouchInputModeToAllInputs();
+}
+
+function toggleOSKeyboardLock() {
+  lockOSKeyboardOnTouch = !lockOSKeyboardOnTouch;
+  const btn = document.getElementById('btn-os-kb-lock');
+  if (btn) {
+    if (lockOSKeyboardOnTouch) {
+      btn.innerText = '📱 Khóa phím máy: BẬT';
+      btn.className = 'text-[11px] font-baloo font-bold px-2.5 py-1 rounded-xl border transition cursor-pointer bg-emerald-50 text-emerald-800 border-emerald-300';
+    } else {
+      btn.innerText = '⌨️ Cho phép phím máy: BẬT';
+      btn.className = 'text-[11px] font-baloo font-bold px-2.5 py-1 rounded-xl border transition cursor-pointer bg-slate-100 text-slate-700 border-slate-300';
+    }
+  }
+  applyTouchInputModeToAllInputs();
+}
+
+function applyTouchInputModeToAllInputs() {
+  const inputs = document.querySelectorAll('#lesson-dynamic-container .lvl-input, #lesson-dynamic-container .carry-input');
+  inputs.forEach(inp => {
+    if (lockOSKeyboardOnTouch && isKeypadVisible) {
+      inp.setAttribute('inputmode', 'none');
+    } else {
+      if (inp.dataset.type === 'wp-op') inp.setAttribute('inputmode', 'text');
+      else inp.setAttribute('inputmode', 'numeric');
+    }
+  });
+}
+
+// 2. Điều hướng màn hình (Trang chủ <-> Phiếu bài tập)
+function goHome() {
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+  document.getElementById('view-lesson').classList.add('hidden');
+  document.getElementById('custom-math-keypad').classList.add('hidden');
+  const floatingBtn = document.getElementById('floating-keypad-Restore');
+  if (floatingBtn) floatingBtn.classList.add('hidden');
+  document.getElementById('view-home').classList.remove('hidden');
+  
+  if (typeof saveDataImmediate === 'function') saveDataImmediate();
+  if (typeof updateDashboardUI === 'function') updateDashboardUI();
+  scrollToTop();
+}
+
+function startLesson(level) {
+  document.getElementById('view-home').classList.add('hidden');
+  document.getElementById('view-lesson').classList.remove('hidden');
+  toggleMathKeypad(isKeypadVisible);
+  switchLevel(level, true);
+}
+
+function switchLevel(level, shouldScroll = true) {
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+  if (typeof saveDataImmediate === 'function') saveDataImmediate();
+  
+  currentLevel = level;
+  if (typeof resetBase10RegroupState === 'function') resetBase10RegroupState();
+  
+  // NẠP DỮ LIỆU ĐỘNG TỪ GOOGLE SHEETS SẼ ĐƯỢC XỬ LÝ Ở ĐÂY (Bước tiếp theo)
+  // Tạm thời hiển thị thông báo đang tải...
+  document.getElementById('lesson-dynamic-container').innerHTML = '<div class="p-10 text-center font-baloo font-extrabold text-2xl text-sky-600 animate-pulse">⏳ Đang tải bài tập từ hệ thống...</div>';
+
+  // Điều hướng trạng thái nút bấm
+  [1, 2, 3].forEach(id => {
+    const btn = document.getElementById(`btn-lvl-${id}`);
+    if (btn) {
+      if (id === level) {
+        btn.className = "btn-3d px-4 sm:px-5 py-2.5 rounded-2xl font-baloo font-extrabold text-sm sm:text-base flex items-center gap-2 bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md cursor-pointer";
+      } else {
+        btn.className = "btn-3d px-4 sm:px-5 py-2.5 rounded-2xl font-baloo font-extrabold text-sm sm:text-base flex items-center gap-2 bg-white text-slate-700 border-2 border-slate-200 hover:bg-slate-50 cursor-pointer";
+      }
+    }
+  });
+  
+  // Sau khi gọi API Google Sheets thành công, hàm onSuccess sẽ gọi tiếp bindAndRestoreLevelState(level)
+  if (typeof loadLessonDataFromGAS === 'function') loadLessonDataFromGAS(level);
+  
+  if (shouldScroll) scrollToTop();
+}
+
+function scrollToTop() {
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// 3. Hệ thống Âm thanh Singleton và Giọng đọc Tiếng Việt (Web Speech API)
+let sharedAudioCtx = null;
+let speechTimeoutId = null;
+let cachedVietnameseVoice = null;
+
+function getSharedAudioContext() {
+  if (!sharedAudioCtx) {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (AudioCtx) sharedAudioCtx = new AudioCtx();
+  }
+  if (sharedAudioCtx && sharedAudioCtx.state === 'suspended') {
+    sharedAudioCtx.resume();
+  }
+  return sharedAudioCtx;
+}
+
+function playKeyClickSound() {
+  try {
+    const ctx = getSharedAudioContext();
+    if (!ctx) return;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    const now = ctx.currentTime;
+    osc.frequency.setValueAtTime(660, now);
+    gain.gain.setValueAtTime(0.05, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.045);
+    osc.start(now);
+    osc.stop(now + 0.045);
+  } catch (e) {}
+}
+
+function playCuteSound(type = 'correct') {
+  try {
+    const ctx = getSharedAudioContext();
+    if (!ctx) return;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'triangle';
+
+    const now = ctx.currentTime;
+    if (type === 'level_complete') {
+      osc.frequency.setValueAtTime(523.25, now);
+      osc.frequency.setValueAtTime(659.25, now + 0.1);
+      osc.frequency.setValueAtTime(783.99, now + 0.2);
+      osc.frequency.setValueAtTime(1046.50, now + 0.3);
+      gain.gain.setValueAtTime(0.2, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.55);
+      osc.start(now);
+      osc.stop(now + 0.55);
+    } else {
+      osc.frequency.setValueAtTime(587.33, now);
+      osc.frequency.setValueAtTime(880.00, now + 0.08);
+      gain.gain.setValueAtTime(0.15, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.28);
+      osc.start(now);
+      osc.stop(now + 0.28);
+    }
+  } catch (e) {}
+}
+
+function initSpeechSynthesisVoices() {
+  if (!('speechSynthesis' in window)) return;
+  const loadVoices = () => {
+    const voices = window.speechSynthesis.getVoices() || [];
+    if (voices.length > 0) {
+      cachedVietnameseVoice =
+        voices.find(v => v.lang && v.lang.toLowerCase() === 'vi-vn') ||
+        voices.find(v => v.lang && v.lang.toLowerCase().includes('vi')) ||
+        null;
+    }
+  };
+  loadVoices();
+  if (window.speechSynthesis.onvoiceschanged !== undefined) {
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+  }
+}
+
+function speakVietnamese(text) {
+  if (!('speechSynthesis' in window)) {
+    alert('Trình duyệt của thiết bị chưa hỗ trợ đọc giọng nói tự động.');
+    return;
+  }
+  try {
+    if (speechTimeoutId) clearTimeout(speechTimeoutId);
+    window.speechSynthesis.cancel();
+
+    speechTimeoutId = setTimeout(() => {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'vi-VN';
+      utterance.rate = 0.92; // Tốc độ đọc chuẩn tiểu học
+      utterance.pitch = 1.1; // Giọng đọc sáng, tươi vui
+      if (!cachedVietnameseVoice) {
+        const voices = window.speechSynthesis.getVoices() || [];
+        cachedVietnameseVoice = voices.find(v => v.lang && v.lang.toLowerCase().includes('vi')) || null;
+      }
+      if (cachedVietnameseVoice) utterance.voice = cachedVietnameseVoice;
+      window.speechSynthesis.speak(utterance);
+    }, 60); // Tránh bị nuốt âm trên Safari iOS
+  } catch (e) {}
+}
+
+function triggerConfetti() {
+  if (typeof confetti === 'function') {
+    confetti({ particleCount: 85, spread: 70, origin: { y: 0.6 } });
+  }
+}
+
+// Khởi chạy giọng đọc
+window.addEventListener('DOMContentLoaded', initSpeechSynthesisVoices);
+</script>

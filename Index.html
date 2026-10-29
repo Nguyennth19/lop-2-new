@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>KidLearn Lớp 2 - Hệ Thống Phiếu Bài Tập Tương Tác</title>
+  
+  <!-- Nạp thư viện ngoài -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Quicksand:wght@600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <!-- Nạp tệp CSS -->
+  <?!= include('Stylesheet'); ?>
+</head>
+<body class="p-2 sm:p-5 flex flex-col items-center">
+
+  <!-- ==================== HEADER HỆ THỐNG ==================== -->
+  <header class="w-full max-w-5xl bg-white/95 backdrop-blur-sm rounded-3xl p-3 sm:px-6 shadow-md border-2 border-sky-200 flex items-center justify-between gap-2 sm:gap-3 mb-5">
+    <div class="flex items-center gap-2.5 cursor-pointer" onclick="goHome()">
+      <div class="w-11 h-11 bg-gradient-to-tr from-amber-400 to-orange-400 rounded-2xl flex items-center justify-center text-white text-2xl shadow-md border border-white">🎒</div>
+      <div>
+        <div class="text-xl sm:text-2xl font-baloo font-extrabold text-sky-900 leading-none flex items-center gap-1">
+          KID<span class="text-rose-500">LEARN</span>
+        </div>
+        <p class="text-[11px] text-sky-600 font-bold uppercase tracking-wider mt-0.5">Toán Lớp 2 • Kết nối tri thức</p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-1.5 sm:gap-2.5">
+      <!-- Đồng hồ đếm thời gian học thực tế -->
+      <div id="study-timer-pill" title="Thời gian bé tập trung học bài" class="hidden sm:flex items-center gap-1.5 bg-sky-50 border-2 border-sky-200 px-3 py-1.5 rounded-2xl text-xs font-baloo font-extrabold text-sky-800">
+        <span>⏱️</span>
+        <span id="header-study-timer">00:00</span>
+      </div>
+
+      <div id="star-badge-header" class="flex items-center gap-1.5 bg-amber-50 border-2 border-amber-200 px-3 sm:px-3.5 py-1.5 rounded-2xl shadow-sm transition-transform duration-300">
+        <span class="text-xl">⭐</span>
+        <span id="global-star-count" class="font-baloo font-extrabold text-amber-600 text-base sm:text-lg">0</span>
+      </div>
+
+      <button onclick="openLoginModal()" class="text-xs text-slate-600 hover:text-slate-900 bg-slate-100 px-2.5 sm:px-3 py-2 rounded-xl font-bold transition flex items-center gap-1 cursor-pointer">
+        <span>👤</span> <span id="header-user-name">Hồ sơ</span>
+      </button>
+
+      <button onclick="toggleParentModal()" class="text-xs text-indigo-700 hover:text-indigo-950 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2.5 sm:px-3.5 py-2 rounded-xl font-baloo font-extrabold transition flex items-center gap-1 cursor-pointer shadow-sm">
+        <span>📊</span> <span class="hidden sm:inline">Góc Bố Mẹ</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ==================== MÀN HÌNH 1: TRANG CHỦ (DASHBOARD) ==================== -->
+  <main id="view-home" class="w-full max-w-5xl space-y-6">
+    
+    <!-- Hero Banner Chào Mừng -->
+    <div class="relative bg-gradient-to-r from-sky-400 via-sky-300 to-emerald-200 rounded-[32px] p-6 sm:p-8 shadow-xl overflow-hidden border-4 border-white flex flex-col md:flex-row items-center justify-between gap-6">
+      <div class="relative z-10 text-center md:text-left max-w-lg">
+        <div class="inline-flex items-center gap-2 bg-white/80 backdrop-blur-sm px-3.5 py-1 rounded-full text-xs font-bold text-sky-800 mb-3 shadow-sm">
+          <span>🌟</span> Chào mừng bé trở lại học tập!
+        </div>
+        <h1 class="text-3xl sm:text-4xl md:text-5xl font-baloo font-extrabold text-sky-950 leading-tight">
+          Chào <span id="dash-greeting-name" class="text-rose-600">Bé</span>! 👋
+        </h1>
+        <p class="text-sky-900 font-bold text-sm sm:text-base mt-2">
+          Hôm nay chúng mình cùng chinh phục 3 cấp độ của Bài 20: Phép cộng (có nhớ) để tích lũy thật nhiều Sao vàng nhé!
+        </p>
+        <div class="mt-5 flex flex-wrap items-center justify-center md:justify-start gap-3">
+          <button onclick="startLesson(1)" class="btn-3d px-7 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-baloo font-extrabold text-lg rounded-2xl shadow-[0_5px_0_#c2410c] flex items-center gap-2 cursor-pointer">
+            <span>🚀</span> VÀO HỌC NGAY
+          </button>
+          <button onclick="toggleParentModal()" class="btn-3d px-5 py-3 bg-white/90 hover:bg-white text-indigo-800 font-baloo font-extrabold text-sm sm:text-base rounded-2xl shadow-md border-2 border-indigo-200 flex items-center gap-1.5 cursor-pointer">
+            <span>📊</span> Xem Báo Cáo Kỹ Năng
+          </button>
+        </div>
+      </div>
+
+      <!-- Hình Chibi học sinh -->
+      <div class="relative w-40 h-40 sm:w-52 sm:h-52 flex-shrink-0 animate-bounce-soft">
+        <svg viewBox="0 0 200 200" class="w-full h-full drop-shadow-2xl">
+          <path d="M40 140 A30 30 0 0 1 80 120 A40 40 0 0 1 150 125 A30 30 0 0 1 180 150 A20 20 0 0 1 160 175 L45 175 A25 25 0 0 1 40 140 Z" fill="#ffffff" opacity="0.9"/>
+          <g transform="translate(10, 0)">
+            <rect x="50" y="80" width="35" height="50" rx="15" fill="#f97316"/>
+            <path d="M75 105 L115 105 L125 155 L65 155 Z" fill="#3b82f6" rx="10"/>
+            <path d="M80 105 L110 105 L115 140 L75 140 Z" fill="#fbbf24"/>
+            <circle cx="68" cy="120" r="10" fill="#fed7aa"/><circle cx="122" cy="118" r="10" fill="#fed7aa"/>
+            <polygon points="120,70 135,75 125,130 115,125" fill="#f43f5e"/>
+            <polygon points="120,70 135,75 128,55" fill="#fbbf24"/>
+            <circle cx="95" cy="75" r="42" fill="#ffedd5"/>
+            <path d="M55 70 C 55 35, 135 35, 135 70 C 130 55, 110 50, 95 55 C 80 50, 60 55, 55 70 Z" fill="#451a03"/>
+            <ellipse cx="80" cy="76" rx="6" ry="8" fill="#1e1b4b"/><ellipse cx="110" cy="76" rx="6" ry="8" fill="#1e1b4b"/>
+            <circle cx="78" cy="73" r="2.5" fill="#ffffff"/><circle cx="108" cy="73" r="2.5" fill="#ffffff"/>
+            <circle cx="70" cy="85" r="7" fill="#fb7185" opacity="0.6"/><circle cx="120" cy="85" r="7" fill="#fb7185" opacity="0.6"/>
+            <path d="M88 88 Q 95 96 102 88" stroke="#be123c" stroke-width="3" stroke-linecap="round" fill="none"/>
+            <polygon points="95,20 125,32 95,40 65,32" fill="#0284c7"/>
+            <rect x="85" y="34" width="20" height="8" rx="3" fill="#0369a1"/>
+          </g>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Danh sách khóa học -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="bg-white rounded-[32px] p-6 border-4 border-sky-300 shadow-xl flex flex-col justify-between relative">
+        <div class="flex items-start gap-4">
+          <div class="w-24 h-24 shrink-0 bg-sky-50 rounded-2xl border-2 border-sky-200 p-2 flex items-center justify-center">
+            <svg viewBox="0 0 100 100" class="w-full h-full drop-shadow">
+              <rect x="10" y="15" width="80" height="55" rx="8" fill="#047857" stroke="#b45309" stroke-width="4"/>
+              <text x="20" y="40" font-family="'Baloo 2', sans-serif" font-size="16" fill="#fef08a" font-weight="bold">28 + 45</text>
+              <text x="20" y="60" font-family="'Baloo 2', sans-serif" font-size="14" fill="#a7f3d0">36 + 17 = ?</text>
+              <circle cx="50" cy="80" r="16" fill="#4ade80"/>
+              <circle cx="43" cy="72" r="5" fill="#ffffff"/><circle cx="43" cy="72" r="2.5" fill="#14532d"/>
+              <circle cx="57" cy="72" r="5" fill="#ffffff"/><circle cx="57" cy="72" r="2.5" fill="#14532d"/>
+            </svg>
+          </div>
+          <div class="flex-1">
+            <span class="inline-block bg-rose-100 text-rose-700 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider mb-1">Tuần 10 • Toán Lớp 2</span>
+            <h2 class="text-xl sm:text-2xl font-baloo font-extrabold text-sky-900 leading-tight">
+              Bài 20: Phép cộng (có nhớ) số có hai chữ số với số có hai chữ số
+            </h2>
+          </div>
+        </div>
+
+        <div class="mt-5 space-y-2.5">
+          <div class="text-sm font-bold text-slate-600">Tiến độ chinh phục 3 cấp độ (51 câu • Mỗi câu đúng +2 ⭐):</div>
+          <div class="grid grid-cols-3 gap-2">
+            <button onclick="startLesson(1)" id="badge-lv1" class="bg-slate-100 border-2 border-slate-200 text-slate-500 rounded-xl py-2.5 text-center font-baloo font-extrabold text-xs sm:text-sm transition cursor-pointer hover:border-pink-400">
+              LV1 • Căn bản <span class="hidden" id="icon-lv1">⭐</span>
+            </button>
+            <button onclick="startLesson(2)" id="badge-lv2" class="bg-slate-100 border-2 border-slate-200 text-slate-500 rounded-xl py-2.5 text-center font-baloo font-extrabold text-xs sm:text-sm transition cursor-pointer hover:border-emerald-400">
+              LV2 • Kỹ năng <span class="hidden" id="icon-lv2">⭐</span>
+            </button>
+            <button onclick="startLesson(3)" id="badge-lv3" class="bg-slate-100 border-2 border-slate-200 text-slate-500 rounded-xl py-2.5 text-center font-baloo font-extrabold text-xs sm:text-sm transition cursor-pointer hover:border-sky-400">
+              LV3 • Nâng cao <span class="hidden" id="icon-lv3">⭐</span>
+            </button>
+          </div>
+        </div>
+
+        <button onclick="startLesson(1)" class="w-full mt-5 py-3 bg-sky-500 hover:bg-sky-600 text-white font-baloo font-extrabold text-lg rounded-2xl shadow-[0_4px_0_#0284c7] btn-3d flex items-center justify-center gap-2 cursor-pointer">
+          <span>🚀</span> BẮT ĐẦU HỌC BÀI NÀY
+        </button>
+      </div>
+
+      <!-- Thẻ Tiếng Việt Lớp 2 (Chờ tích hợp) -->
+      <div class="bg-gradient-to-br from-indigo-50 to-sky-50 rounded-[32px] p-6 border-4 border-indigo-200 shadow-md flex flex-col justify-center items-center text-center space-y-3">
+        <div class="text-6xl">📖</div>
+        <h3 class="font-baloo font-extrabold text-2xl text-indigo-950">Tiếng Việt Lớp 2</h3>
+        <p class="text-sm font-bold text-indigo-800">
+          Mở rộng vốn từ, đọc hiểu văn bản và luyện ghép câu trên vở ô ly tiểu học.
+        </p>
+        <span class="px-4 py-1.5 bg-indigo-200/80 text-indigo-950 border border-indigo-400 font-baloo font-extrabold rounded-full text-xs">
+          Sẵn sàng kích hoạt ở Giai đoạn tiếp theo
+        </span>
+      </div>
+    </div>
+  </main>
+
+  <!-- ==================== MÀN HÌNH 2: KHÔNG GIAN LÀM BÀI (3 CẤP ĐỘ) ==================== -->
+  <main id="view-lesson" class="w-full max-w-5xl hidden">
+    
+    <!-- Thanh chọn cấp độ đặt ngay đầu trang -->
+    <div class="w-full bg-white/95 backdrop-blur-sm rounded-3xl p-3 sm:p-4 border-2 border-amber-300 shadow-md mb-4 flex flex-wrap items-center justify-between gap-3">
+      <button onclick="goHome()" type="button" class="btn-3d px-4 py-2 bg-slate-100 border-2 border-slate-300 hover:bg-slate-200 text-slate-700 font-baloo font-extrabold text-sm rounded-2xl flex items-center gap-1.5 cursor-pointer">
+        <span>🏠</span> Trang Chủ
+      </button>
+
+      <div class="flex flex-wrap items-center justify-center gap-2 flex-1">
+        <button onclick="switchLevel(1)" id="btn-lvl-1" type="button"
+          class="btn-3d px-4 sm:px-5 py-2.5 rounded-2xl font-baloo font-extrabold text-sm sm:text-base flex items-center gap-2 bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md cursor-pointer">
+          <span>📕</span> LV1 - Kiến thức căn bản
+        </button>
+
+        <button onclick="switchLevel(2)" id="btn-lvl-2" type="button"
+          class="btn-3d px-4 sm:px-5 py-2.5 rounded-2xl font-baloo font-extrabold text-sm sm:text-base flex items-center gap-2 bg-white text-slate-700 border-2 border-slate-200 hover:bg-slate-50 cursor-pointer">
+          <span>📗</span> LV2 - Nâng cao kỹ năng
+        </button>
+
+        <button onclick="switchLevel(3)" id="btn-lvl-3" type="button"
+          class="btn-3d px-4 sm:px-5 py-2.5 rounded-2xl font-baloo font-extrabold text-sm sm:text-base flex items-center gap-2 bg-white text-slate-700 border-2 border-slate-200 hover:bg-slate-50 cursor-pointer">
+          <span>📘</span> LV3 - Bài tập nâng cao
+        </button>
+      </div>
+
+      <button onclick="toggleMathKeypad()" id="btn-toggle-keypad" type="button"
+        class="btn-3d px-3.5 py-2 bg-sky-500 hover:bg-sky-600 text-white border border-sky-600 font-baloo font-extrabold text-xs sm:text-sm rounded-2xl flex items-center gap-1.5 cursor-pointer shadow">
+        <span>🔢</span> <span id="lbl-toggle-keypad">Ẩn bàn phím</span>
+      </button>
+    </div>
+
+    <!-- Chú thích quy tắc 3 màu phản hồi & điều hướng -->
+    <div class="w-full bg-white/90 rounded-2xl px-4 py-2 mb-4 border border-sky-200 flex flex-wrap items-center justify-center gap-4 text-xs font-bold text-slate-700 shadow-sm">
+      <span class="flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded bg-emerald-100 border border-emerald-500 inline-block"></span> Xanh: Đúng (+2 ⭐)</span>
+      <span class="flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded bg-amber-100 border border-amber-400 inline-block"></span> Vàng: Chưa điền (Gồm cả Ô Nhớ)</span>
+      <span class="flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded bg-rose-100 border border-rose-500 inline-block"></span> Đỏ: Cần tính lại</span>
+      <span class="text-rose-600 font-extrabold">⬅️ Tính dọc: Đơn vị → Ô Nhớ (1) → Chục</span>
+    </div>
+
+    <!-- KHUNG CHỨA NỘI DUNG PHIẾU BÀI TẬP ĐỘNG (Tách biệt hoàn toàn phía trên bàn phím) -->
+    <div id="lesson-dynamic-container" class="w-full bg-white rounded-[32px] shadow-2xl border-4 border-amber-300 overflow-hidden relative mb-4">
+    </div>
+  </main>
+
+  <!-- ==================== BÀN PHÍM TOÁN HỌC CẢM ỨNG KHÓA VÀO CHÂN TRANG (TÁCH KHỎI MODULE HỌC) ==================== -->
+  <footer id="custom-math-keypad" class="keypad-footer-dock bg-white/95 backdrop-blur-md border-t-4 border-x-2 border-sky-400 shadow-[0_-10px_28px_rgba(2,132,199,0.2)] px-2.5 sm:px-4 py-2.5 hidden transition-all duration-200">
+    <div class="max-w-4xl mx-auto flex flex-col gap-2">
+      <!-- Thanh trạng thái hướng dẫn từng bước & Tùy chọn cảm ứng -->
+      <div class="flex flex-wrap items-center justify-between gap-2 px-1">
+        <div class="flex items-center gap-2">
+          <span class="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-sky-100 text-sky-700 text-xs font-bold">🔢</span>
+          <span id="keypad-active-hint" class="text-xs sm:text-sm font-baloo font-extrabold text-sky-900">
+            Chạm vào ô trống để nhập số (Ma trận 3×5: Số bên trái • Phép tính & Tiếp bên phải)
+          </span>
+        </div>
+
+        <div class="flex items-center gap-1.5 ml-auto">
+          <button type="button" onmousedown="event.preventDefault()" onclick="toggleOSKeyboardLock()" id="btn-os-kb-lock"
+            title="Chặn bàn phím ảo của điện thoại/iPad bật lên che màn hình"
+            class="text-[11px] font-baloo font-bold px-2.5 py-1 rounded-xl border transition cursor-pointer bg-emerald-50 text-emerald-800 border-emerald-300">
+            📱 Khóa phím máy: BẬT
+          </button>
+          <button type="button" onmousedown="event.preventDefault()" onclick="toggleMathKeypad(false)"
+            class="text-xs font-baloo font-extrabold text-slate-600 hover:text-rose-600 px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-rose-50 border border-slate-200 cursor-pointer">
+            Thu gọn ▼
+          </button>
+        </div>
+      </div>
+
+      <!-- Ma trận 3 hàng x 5 cột trên Mobile (Số 0-9 bên trái, +, -, Xóa, Tiếp bên phải) & 14 cột trên Desktop -->
+      <div class="keypad-matrix">
+        <!-- Cụm 10 phím số (0-9) nằm bên trái trên Mobile -->
+        <button type="button" data-kpos="1" data-key="1" onmousedown="event.preventDefault()" onclick="keypadPress('1')" class="touch-key rounded-2xl bg-sky-50 hover:bg-sky-100 active:bg-sky-200 border-2 border-sky-300 font-math font-extrabold text-xl sm:text-2xl text-sky-950 shadow-[0_4px_0_#7dd3fc] flex items-center justify-center cursor-pointer">1</button>
+        <button type="button" data-kpos="2" data-key="2" onmousedown="event.preventDefault()" onclick="keypadPress('2')" class="touch-key rounded-2xl bg-sky-50 hover:bg-sky-100 active:bg-sky-200 border-2 border-sky-300 font-math font-extrabold text-xl sm:text-2xl text-sky-950 shadow-[0_4px_0_#7dd3fc] flex items-center justify-center cursor-pointer">2</button>
+        <button type="button" data-kpos="3" data-key="3" onmousedown="event.preventDefault()" onclick="keypadPress('3')" class="touch-key rounded-2xl bg-sky-50 hover:bg-sky-100 active:bg-sky-200 border-2 border-sky-300 font-math font-extrabold text-xl sm:text-2xl text-sky-950 shadow-[0_4px_0_#7dd3fc] flex items-center justify-center cursor-pointer">3</button>
+        <button type="button" data-kpos="4" data-key="4" onmousedown="event.preventDefault()" onclick="keypadPress('4')" class="touch-key rounded-2xl bg-sky-50 hover:bg-sky-100 active:bg-sky-200 border-2 border-sky-300 font-math font-extrabold text-xl sm:text-2xl text-sky-950 shadow-[0_4px_0_#7dd3fc] flex items-center justify-center cursor-pointer">4</button>
+        <button type="button" data-kpos="5" data-key="5" onmousedown="event.preventDefault()" onclick="keypadPress('5')" class="touch-key rounded-2xl bg-sky-50 hover:bg-sky-100 active:bg-sky-200 border-2 border-sky-300 font-math font-extrabold text-xl sm:text-2xl text-sky-950 shadow-[0_4px_0_#7dd3fc] flex items-center justify-center cursor-pointer">5</button>
+        <button type="button" data-kpos="6" data-key="6" onmousedown="event.preventDefault()" onclick="keypadPress('6')" class="touch-key rounded-2xl bg-sky-50 hover:bg-sky-100 active:bg-sky-200 border-2 border-sky-300 font-math font-extrabold text-xl sm:text-2xl text-sky-950 shadow-[0_4px_0_#7dd3fc] flex items-center justify-center cursor-pointer">6</button>
+        <button type="button" data-kpos="7" data-key="7" onmousedown="event.preventDefault()" onclick="keypadPress('7')" class="touch-key rounded-2xl bg-sky-50 hover:bg-sky-100 active:bg-sky-200 border-2 border-sky-300 font-math font-extrabold text-xl sm:text-2xl text-sky-950 shadow-[0_4px_0_#7dd3fc] flex items-center justify-center cursor-pointer">7</button>
+        <button type="button" data-kpos="8" data-key="8" onmousedown="event.preventDefault()" onclick="keypadPress('8')" class="touch-key rounded-2xl bg-sky-50 hover:bg-sky-100 active:bg-sky-200 border-2 border-sky-300 font-math font-extrabold text-xl sm:text-2xl text-sky-950 shadow-[0_4px_0_#7dd3fc] flex items-center justify-center cursor-pointer">8</button>
+        <button type="button" data-kpos="9" data-key="9" onmousedown="event.preventDefault()" onclick="keypadPress('9')" class="touch-key rounded-2xl bg-sky-50 hover:bg-sky-100 active:bg-sky-200 border-2 border-sky-300 font-math font-extrabold text-xl sm:text-2xl text-sky-950 shadow-[0_4px_0_#7dd3fc] flex items-center justify-center cursor-pointer">9</button>
+        <button type="button" data-kpos="0" data-key="0" onmousedown="event.preventDefault()" onclick="keypadPress('0')" class="touch-key rounded-2xl bg-sky-50 hover:bg-sky-100 active:bg-sky-200 border-2 border-sky-300 font-math font-extrabold text-xl sm:text-2xl text-sky-950 shadow-[0_4px_0_#7dd3fc] flex items-center justify-center cursor-pointer">0</button>
+
+        <!-- Cụm 4 phím chức năng (+, -, Xóa, Tiếp) to rõ nằm bên phải trên Mobile -->
+        <button type="button" data-kpos="plus" id="key-btn-plus" onmousedown="event.preventDefault()" onclick="keypadPress('+')" class="touch-key rounded-2xl bg-pink-100 hover:bg-pink-200 active:bg-pink-300 border-2 border-pink-400 font-math font-extrabold text-2xl text-rose-600 shadow-[0_4px_0_#f472b6] flex items-center justify-center cursor-pointer">+</button>
+        <button type="button" data-kpos="minus" id="key-btn-minus" onmousedown="event.preventDefault()" onclick="keypadPress('-')" class="touch-key rounded-2xl bg-amber-100 hover:bg-amber-200 active:bg-amber-300 border-2 border-amber-400 font-math font-extrabold text-2xl text-amber-800 shadow-[0_4px_0_#fbbf24] flex items-center justify-center cursor-pointer">–</button>
+        <button type="button" data-kpos="del" onmousedown="event.preventDefault()" onclick="keypadPress('BACKSPACE')" class="touch-key rounded-2xl bg-rose-100 hover:bg-rose-200 active:bg-rose-300 border-2 border-rose-300 font-baloo font-extrabold text-xs sm:text-sm text-rose-700 shadow-[0_4px_0_#fda4af] flex items-center justify-center cursor-pointer px-1">⌫ Xóa</button>
+        <button type="button" data-kpos="next" onmousedown="event.preventDefault()" onclick="keypadPress('NEXT')" class="touch-key rounded-2xl bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 border-2 border-emerald-600 font-baloo font-extrabold text-sm sm:text-sm text-white shadow-[0_4px_0_#15803d] flex items-center justify-center cursor-pointer px-1">Tiếp ▶</button>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Nút nổi bật lại bàn phím khi bé thu gọn -->
+  <button id="floating-keypad-Restore" onclick="toggleMathKeypad(true)" type="button"
+    class="fixed bottom-4 right-4 z-40 hidden btn-3d px-4 py-3 rounded-2xl bg-sky-600 hover:bg-sky-700 text-white font-baloo font-extrabold text-sm shadow-xl border-2 border-white flex items-center gap-2 cursor-pointer">
+    <span>🔢</span> Mở Bàn Phím Toán
+  </button>
+
+  <!-- ==================== MODAL: THIẾT LẬP HỒ SƠ ==================== -->
+  <div id="modal-login" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border-4 border-sky-300 space-y-5">
+      <div class="text-center">
+        <div class="text-5xl mb-2">🎒</div>
+        <h2 class="font-baloo font-extrabold text-2xl text-sky-900">Chào bạn nhỏ!</h2>
+        <p class="text-sm font-bold text-slate-600 mt-1">Hãy nhập tên và lớp của em để hệ thống tự động điền vào phiếu và lưu sao thưởng nhé!</p>
+      </div>
+      <div class="space-y-3 font-bold text-slate-800 text-sm">
+        <div>
+          <label class="block mb-1 text-sky-800">Họ và tên của em:</label>
+          <input type="text" id="input-name" placeholder="Ví dụ: Nguyễn Minh Anh" class="w-full border-2 border-sky-200 rounded-xl px-4 py-2.5 focus:border-sky-500 focus:outline-none text-base font-bold text-slate-950" />
+        </div>
+        <div>
+          <label class="block mb-1 text-sky-800">Lớp của em:</label>
+          <input type="text" id="input-class" placeholder="Ví dụ: 2/12" class="w-full border-2 border-sky-200 rounded-xl px-4 py-2.5 focus:border-sky-500 focus:outline-none text-base font-bold text-slate-950" />
+        </div>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="saveUserProfile()" type="button" class="flex-1 py-3 bg-sky-500 hover:bg-sky-600 text-white font-baloo font-extrabold text-lg rounded-xl shadow-[0_4px_0_#0284c7] btn-3d cursor-pointer">
+          LƯU HỒ SƠ & BẮT ĐẦU
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: CHÚC MỪNG HOÀN THÀNH LEVEL ==================== -->
+  <div id="modal-success" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border-4 border-emerald-400 text-center space-y-4">
+      <div class="text-6xl animate-bounce-soft">🏆</div>
+      <h2 class="font-baloo font-extrabold text-3xl text-emerald-600">Hoàn Thành Cấp Độ!</h2>
+      <p class="text-base font-bold text-slate-700">Bé đã giải đúng toàn bộ các câu trong phiếu này và nhận thêm thưởng hoàn thành cấp độ:</p>
+      <div class="inline-flex items-center gap-2 bg-amber-50 border-2 border-amber-300 px-6 py-2 rounded-full shadow-inner">
+        <span class="text-3xl">⭐</span>
+        <span class="font-baloo font-extrabold text-3xl text-amber-600">+10 Sao Thưởng Thêm</span>
+      </div>
+      
+      <div class="pt-4 border-t-2 border-slate-100 flex flex-col gap-2.5">
+        <button id="btn-next-level" onclick="goToNextLevel()" type="button" class="w-full py-3.5 bg-gradient-to-r from-sky-400 to-blue-500 hover:from-sky-500 hover:to-blue-600 text-white font-baloo font-extrabold text-xl rounded-2xl shadow-[0_5px_0_#0369a1] btn-3d flex items-center justify-center gap-2 cursor-pointer">
+          <span>🚀</span> CHƠI TIẾP CẤP ĐỘ SAU
+        </button>
+        <button onclick="closeSuccessModal()" type="button" class="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-sm rounded-xl cursor-pointer">
+          Ở lại xem bài
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL GÓC BỐ MẸ (#parent-modal) ==================== -->
+  <div id="parent-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+    <div class="bg-white rounded-[28px] max-w-2xl w-full p-5 sm:p-6 shadow-2xl border-4 border-indigo-200 space-y-5 my-auto max-h-[92vh] overflow-y-auto">
+      <div class="flex justify-between items-center border-b-2 border-slate-100 pb-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-10 h-10 rounded-2xl bg-indigo-100 text-indigo-700 flex items-center justify-center text-xl font-bold">📊</div>
+          <div>
+            <h3 class="font-baloo font-extrabold text-xl text-indigo-950 leading-none">Góc Bố Mẹ • Báo Cáo Học Tập</h3>
+            <p class="text-xs font-bold text-slate-500 mt-1">Thống kê thời gian, tỷ lệ đúng ngay lần đầu & chẩn đoán lỗi</p>
+          </div>
+        </div>
+        <button onclick="toggleParentModal()" type="button" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-600 font-bold cursor-pointer">✕</button>
+      </div>
+
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+        <div class="bg-sky-50 border-2 border-sky-200 rounded-2xl p-3 text-center">
+          <div class="text-[11px] font-bold text-sky-700 uppercase">Học sinh</div>
+          <div id="parent-student-name" class="font-baloo font-extrabold text-sm sm:text-base text-sky-950 mt-0.5 truncate">Chưa nhập</div>
+          <div id="parent-progress-text" class="text-[11px] font-bold text-sky-600 mt-0.5">0/3 cấp độ</div>
+        </div>
+        <div class="bg-amber-50 border-2 border-amber-200 rounded-2xl p-3 text-center">
+          <div class="text-[11px] font-bold text-amber-700 uppercase">Thời gian học</div>
+          <div id="parent-study-time" class="font-baloo font-extrabold text-base sm:text-lg text-amber-900 mt-0.5">0 phút 00 giây</div>
+        </div>
+        <div class="bg-emerald-50 border-2 border-emerald-200 rounded-2xl p-3 text-center">
+          <div class="text-[11px] font-bold text-emerald-700 uppercase">Đúng lần đầu</div>
+          <div id="parent-first-try-rate" class="font-baloo font-extrabold text-base sm:text-lg text-emerald-800 mt-0.5">0%</div>
+        </div>
+        <div class="bg-rose-50 border-2 border-rose-200 rounded-2xl p-3 text-center">
+          <div class="text-[11px] font-bold text-rose-700 uppercase">Sao tích lũy</div>
+          <div id="parent-star-total" class="font-baloo font-extrabold text-base sm:text-lg text-rose-600 mt-0.5">0 ⭐</div>
+        </div>
+      </div>
+
+      <div id="parent-diagnostic-advice" class="bg-white border border-amber-300 rounded-xl p-3 text-xs font-bold text-slate-700 leading-relaxed">
+        💡 Trẻ cần hoàn thành các bài tập để hệ thống đưa ra đánh giá phân tích.
+      </div>
+
+      <div class="flex flex-wrap items-center justify-end gap-2 pt-1">
+        <button onclick="toggleParentModal()" type="button" class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-baloo font-extrabold shadow-sm cursor-pointer ml-auto">
+          Đóng báo cáo
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Nạp đủ cả 3 tệp Script theo đúng thứ tự: Render -> UI -> Logic -->
+  <?!= include('Script_Render'); ?>
+  <?!= include('Script_UI'); ?>
+  <?!= include('Script_Logic'); ?>
+
+</body>
+</html>

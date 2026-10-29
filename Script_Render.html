@@ -1,0 +1,547 @@
+<script>
+// ============================================================================
+// KHỐI SCRIPT_RENDER: TẠO GIAO DIỆN HTML CHO CÁC CẤP ĐỘ (LV1, LV2, LV3)
+// ============================================================================
+
+const THEMES = {
+  pink: { bg: 'bg-[#FFF0F5]', border: 'border-[#F472B6]', text: 'text-pink-600', fill: '#ec4899', lightBorder: 'border-pink-400' },
+  blue: { bg: 'bg-[#F0F9FF]', border: 'border-[#38BDF8]', text: 'text-sky-600', fill: '#0284c7', lightBorder: 'border-sky-400' },
+  yellow: { bg: 'bg-[#FEFCE8]', border: 'border-[#FACC15]', text: 'text-amber-600', fill: '#f59e0b', lightBorder: 'border-amber-400' },
+  green: { bg: 'bg-[#F0FDF4]', border: 'border-[#4ADE80]', text: 'text-emerald-600', fill: '#16a34a', lightBorder: 'border-emerald-400' },
+  purple: { bg: 'bg-[#FAF5FF]', border: 'border-[#C084FC]', text: 'text-purple-600', fill: '#9333ea', lightBorder: 'border-purple-400' },
+  orange: { bg: 'bg-[#FFF7ED]', border: 'border-[#FB923C]', text: 'text-orange-600', fill: '#ea580c', lightBorder: 'border-orange-400' }
+};
+
+function getEffectiveInputMode(defaultMode = 'numeric') {
+  return (lockOSKeyboardOnTouch && isKeypadVisible) ? 'none' : defaultMode;
+}
+
+function renderSpeakerBtn(textToRead, label = 'Nghe') {
+  const safeText = textToRead.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+  return `<button type="button" onclick="speakVietnamese('${safeText}')" title="Nghe đọc đề bài"
+    class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-sky-100 hover:bg-sky-200 text-sky-800 border border-sky-300 text-xs font-baloo font-extrabold shadow-sm transition cursor-pointer shrink-0">
+    <span>🔊</span> <span>${label}</span>
+  </button>`;
+}
+
+function getHeaderHTML(title, subtitle, lvNum) {
+  return `
+    <div class="bg-gradient-to-b from-sky-200 via-sky-100 to-white px-4 pt-6 pb-5 text-center border-b-4 border-dashed border-sky-100 relative">
+      <div class="inline-block wood-board text-white px-6 py-1 rounded-2xl font-baloo font-extrabold text-lg uppercase mb-2">TOÁN LỚP 2</div>
+      <h1 class="text-2xl sm:text-3xl font-baloo title-3d-pink uppercase leading-tight tracking-wide">${title}</h1>
+      <div class="mt-2 inline-flex items-center gap-2 bg-pink-50 border border-pink-200 px-4 py-1 rounded-full text-xs sm:text-sm font-bold text-pink-700 shadow-sm">
+        <span>🌸</span> ${subtitle}
+      </div>
+      <div class="mt-4 flex flex-wrap items-center justify-center gap-6 text-sm font-bold text-slate-700">
+        <div class="flex items-center gap-2">
+          <span>❤️ Họ và tên:</span>
+          <input type="text" id="header-name-lv${lvNum}" oninput="syncHeaderProfileInput(${lvNum})" placeholder="..........................................................." class="bg-transparent border-b-2 border-dotted border-slate-400 focus:border-sky-500 focus:outline-none px-2 py-0.5 text-slate-950 font-bold w-48 sm:w-60 text-center text-sm" />
+        </div>
+        <div class="flex items-center gap-2">
+          <span>Lớp:</span>
+          <input type="text" id="header-class-lv${lvNum}" oninput="syncHeaderProfileInput(${lvNum})" placeholder="..............." class="bg-transparent border-b-2 border-dotted border-slate-400 focus:border-sky-500 focus:outline-none px-2 py-0.5 text-slate-950 font-bold w-20 text-center text-sm" />
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderSectionControlBar(sectionId) {
+  return `
+    <div class="flex flex-col gap-2 pt-2">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div id="msg-sec-${sectionId}" class="text-sm font-baloo font-extrabold text-slate-700"></div>
+        <div class="flex flex-wrap items-center gap-2 ml-auto">
+          <button type="button" onclick="gradeSection('${sectionId}')"
+            class="btn-3d px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-baloo font-extrabold text-sm rounded-xl shadow-[0_3px_0_#15803d] flex items-center gap-1.5 cursor-pointer">
+            <span>✅</span> Kiểm tra bài này
+          </button>
+          <button type="button" onclick="randomizeSection('${sectionId}')"
+            class="btn-3d px-3.5 py-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-800 font-baloo font-extrabold text-xs rounded-xl border border-indigo-300 flex items-center gap-1 cursor-pointer">
+            <span>🎲</span> Đổi đề bài này
+          </button>
+          <button type="button" onclick="resetSection('${sectionId}')"
+            class="btn-3d px-3 py-2 bg-amber-100 hover:bg-amber-200 text-amber-800 font-baloo font-extrabold text-xs rounded-xl border border-amber-300 cursor-pointer">
+            🔄 Làm lại
+          </button>
+        </div>
+      </div>
+      <div id="diag-sec-${sectionId}" class="hidden bg-amber-50 border-2 border-amber-300 rounded-2xl p-3 text-xs sm:text-sm text-slate-800 space-y-1.5 shadow"></div>
+    </div>`;
+}
+
+function renderStandardVerticalCard(item, probId) {
+  const t = THEMES[item.theme];
+  const d1 = String(item.n1).split('');
+  const d2 = String(item.n2).split('');
+  const ansDigits = String(item.ans).split('');
+  const imode = getEffectiveInputMode('numeric');
+
+  return `
+    <div data-prob-id="${probId}" data-n1="${item.n1}" data-n2="${item.n2}" data-ans-total="${item.ans}"
+         onclick="focusVerticalCardStart(this, event)"
+         class="std-vertical-card ${t.bg} border-2 ${t.border} rounded-2xl p-2.5 sm:p-3 flex flex-col items-center shadow relative cursor-pointer select-none">
+      <div class="w-full flex items-center justify-between gap-1 mb-0.5">
+        <span class="text-xs font-bold ${t.text}">${item.l}</span>
+        <span class="rtl-step-hint text-[10px] font-baloo font-bold text-slate-400">ĐV → Nhớ → Chục</span>
+        <span class="prob-star-badge hidden text-[11px] font-baloo font-extrabold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full">+2⭐</span>
+      </div>
+
+      <div class="vertical-math-matrix text-[10px] font-sans font-extrabold text-slate-400 uppercase tracking-tighter mb-0.5">
+        <span></span><span>Chục</span><span>ĐV</span>
+      </div>
+
+      <div class="vertical-math-matrix mb-0.5">
+        <span class="text-[9px] font-sans font-bold text-amber-700">nhớ</span>
+        <input type="text" inputmode="${imode}" maxlength="1" data-role="carry" data-expected="1" title="Ô ghi số nhớ (Bắt buộc nhớ 1 chục)"
+          class="carry-input w-[30px] h-[30px] text-center font-math font-extrabold text-base text-rose-600 bg-amber-50/90 border border-dashed border-amber-400 rounded-md focus:outline-none focus:bg-yellow-100 focus:border-amber-600 focus:border-solid transition-all" />
+        <span></span>
+      </div>
+
+      <div class="calc-box text-slate-950">
+        <div class="vertical-math-matrix">
+          <span></span>
+          <span class="w-[34px] text-center">${d1[0]}</span>
+          <span class="w-[34px] text-center">${d1[1]}</span>
+        </div>
+        <div class="vertical-math-matrix border-b-[2.5px] border-slate-900 pb-1 my-0.5">
+          <span class="text-xl font-bold font-sans text-rose-500">${item.op}</span>
+          <span class="w-[34px] text-center">${d2[0]}</span>
+          <span class="w-[34px] text-center">${d2[1]}</span>
+        </div>
+      </div>
+
+      <div class="vo-oly-grid w-[98px] h-14 rounded-xl flex items-center justify-center mt-1.5 shadow-inner">
+        <div class="vertical-math-matrix calc-box">
+          <span></span>
+          <input type="text" inputmode="${imode}" maxlength="1" data-type="vert-digit" data-col="tens" data-ans="${ansDigits[0]}" title="Chữ số hàng chục"
+            class="lvl-input w-[34px] h-[42px] text-center font-math font-bold text-2xl text-blue-800 bg-white/90 border border-dashed border-sky-400 rounded-lg focus:outline-none focus:bg-yellow-50 focus:border-sky-600 focus:border-solid transition-colors duration-200" />
+          <input type="text" inputmode="${imode}" maxlength="1" data-type="vert-digit" data-col="ones" data-ans="${ansDigits[1]}" title="Chữ số hàng đơn vị (Nhập trước)"
+            class="lvl-input w-[34px] h-[42px] text-center font-math font-bold text-2xl text-blue-800 bg-white/90 border border-dashed border-sky-400 rounded-lg focus:outline-none focus:bg-yellow-50 focus:border-sky-600 focus:border-solid transition-colors duration-200" />
+        </div>
+      </div>
+
+      <div class="card-diag-badge hidden mt-1.5 w-full text-center text-[10px] font-baloo font-extrabold text-rose-700 bg-rose-100/90 border border-rose-300 px-1.5 py-0.5 rounded-lg leading-tight"></div>
+    </div>`;
+}
+
+function renderStructuredWordProblemSolution(item) {
+  const imodeNum = getEffectiveInputMode('numeric');
+  const imodeOp = getEffectiveInputMode('text');
+  return `
+    <div class="bg-amber-50/90 border border-dashed border-amber-400 rounded-2xl px-3.5 py-2 text-xs sm:text-sm text-slate-800 flex flex-wrap items-center gap-1.5 shadow-sm">
+      <span class="font-baloo font-extrabold text-amber-800 uppercase underline mr-1">Tóm tắt:</span>
+      <span>${item.tomTat}</span>
+    </div>
+
+    <div class="vo-oly-grid p-3.5 sm:p-4 rounded-2xl space-y-2.5 text-sm word-problem-card"
+         data-n1="${item.n1}" data-op="${item.op}" data-n2="${item.n2}" data-sum="${item.ansNum}">
+      <div class="text-center font-baloo font-extrabold text-slate-950 underline text-base uppercase">BÀI GIẢI</div>
+      <div class="text-slate-950 font-bold">${item.solveTxt}</div>
+
+      <div class="flex items-center gap-1.5 sm:gap-2 font-bold text-slate-950 flex-wrap sm:flex-nowrap">
+        <span class="whitespace-nowrap">Phép tính:</span>
+        <div class="flex items-center gap-1 sm:gap-1.5 flex-1 min-w-[210px] justify-center sm:justify-start">
+          <input type="text" inputmode="${imodeNum}" maxlength="2" data-type="wp-n1" data-ans="${item.n1}" title="Số hạng thứ nhất"
+            class="lvl-input oly-blank bg-transparent w-12 sm:w-14 text-base sm:text-lg text-blue-900" />
+          <input type="text" inputmode="${imodeOp}" maxlength="1" data-type="wp-op" data-ans="${item.op}" title="Dấu phép tính (+ hoặc -)"
+            class="lvl-input oly-blank bg-transparent w-9 sm:w-10 text-base sm:text-lg text-rose-600 font-extrabold" />
+          <input type="text" inputmode="${imodeNum}" maxlength="2" data-type="wp-n2" data-ans="${item.n2}" title="Số hạng thứ hai"
+            class="lvl-input oly-blank bg-transparent w-12 sm:w-14 text-base sm:text-lg text-blue-900" />
+          <span class="font-math font-extrabold text-slate-800 text-base sm:text-lg px-0.5">=</span>
+          <input type="text" inputmode="${imodeNum}" maxlength="2" data-type="wp-sum" data-ans="${item.ansNum}" title="Kết quả phép tính"
+            class="lvl-input oly-blank bg-transparent w-12 sm:w-14 text-base sm:text-lg text-blue-900" />
+        </div>
+        <span class="whitespace-nowrap">${item.unit1}</span>
+      </div>
+
+      <div class="flex items-center gap-2 font-bold text-slate-950 pt-1 border-t border-sky-100">
+        <span class="whitespace-nowrap">Đáp số:</span>
+        <input type="text" inputmode="${imodeNum}" maxlength="3" data-type="ans" data-ans="${item.ansNum}"
+          class="lvl-input oly-blank bg-transparent w-20 sm:w-24 text-base sm:text-lg text-blue-900" />
+        <span class="whitespace-nowrap">${item.unit2}</span>
+      </div>
+
+      <div class="wp-diag-badge hidden mt-1 text-xs font-baloo font-bold text-rose-700 bg-rose-50 border border-rose-300 rounded-xl px-3 py-1.5"></div>
+    </div>`;
+}
+
+function renderPuzzleCell(cellObj, rowIdx, colIdx) {
+  const imode = getEffectiveInputMode('numeric');
+  if (typeof cellObj === 'object' && cellObj !== null && cellObj.ans !== undefined) {
+    return `<input type="text" inputmode="${imode}" maxlength="1" data-type="digit" data-row="${rowIdx}" data-col="${colIdx}" data-ans="${cellObj.ans}"
+      class="lvl-input w-[34px] h-[42px] text-center font-math font-bold text-2xl text-blue-800 bg-white/90 border border-dashed border-sky-400 rounded-lg focus:outline-none focus:bg-yellow-50 focus:border-sky-600 focus:border-solid transition-colors duration-200" />`;
+  }
+  return `<span class="w-[34px] h-[42px] flex items-center justify-center font-math font-bold text-2xl text-slate-950">${cellObj}</span>`;
+}
+
+function renderVerticalPuzzleCard(item, probId) {
+  const t = THEMES[item.theme];
+  const r0_0 = typeof item.rows[0][0] === 'object' ? '' : item.rows[0][0];
+  const r0_1 = typeof item.rows[0][1] === 'object' ? '' : item.rows[0][1];
+  const r1_0 = typeof item.rows[1][0] === 'object' ? '' : item.rows[1][0];
+  const r1_1 = typeof item.rows[1][1] === 'object' ? '' : item.rows[1][1];
+
+  return `
+    <div data-prob-id="${probId}" onclick="focusPuzzleCardStart(this, event)"
+         class="${t.bg} border-2 ${t.border} rounded-2xl p-3 flex flex-col items-center shadow puzzle-card relative cursor-pointer select-none"
+         data-label="${item.l}" data-sum="${item.sum}" data-r00="${r0_0}" data-r01="${r0_1}" data-r10="${r1_0}" data-r11="${r1_1}">
+      <div class="w-full flex items-center justify-between">
+        <span class="text-xs font-bold ${t.text}">${item.l}</span>
+        <span class="prob-star-badge hidden text-[11px] font-baloo font-extrabold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full">+2⭐</span>
+      </div>
+      <div class="calc-box text-slate-950 mt-1 space-y-1">
+        <div class="vertical-math-matrix">
+          <span></span>
+          ${renderPuzzleCell(item.rows[0][0], 0, 0)}
+          ${renderPuzzleCell(item.rows[0][1], 0, 1)}
+        </div>
+        <div class="vertical-math-matrix border-b-[2.5px] border-slate-900 pb-1.5">
+          <span class="text-xl font-bold font-sans text-rose-500">${item.op}</span>
+          ${renderPuzzleCell(item.rows[1][0], 1, 0)}
+          ${renderPuzzleCell(item.rows[1][1], 1, 1)}
+        </div>
+      </div>
+      <div class="vo-oly-grid w-[98px] h-14 rounded-xl flex items-center justify-center mt-1.5 shadow-inner">
+        <div class="vertical-math-matrix calc-box text-slate-950">
+          <span></span>
+          ${renderPuzzleCell(item.rows[2][0], 2, 0)}
+          ${renderPuzzleCell(item.rows[2][1], 2, 1)}
+        </div>
+      </div>
+      <div class="card-diag-badge hidden mt-1.5 w-full text-center text-[10px] font-baloo font-extrabold text-rose-700 bg-rose-100/90 border border-rose-300 px-1.5 py-0.5 rounded-lg leading-tight"></div>
+    </div>`;
+}
+
+function getFooterButtons() {
+  return `
+    <div class="border-t-2 border-slate-200 pt-6 pb-2 flex flex-col sm:flex-row flex-wrap items-center justify-center gap-3.5">
+      <button onclick="gradeLevel()" type="button" class="btn-3d w-full sm:w-64 py-3.5 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white font-baloo font-extrabold text-lg rounded-2xl shadow-[0_5px_0_#15803d] cursor-pointer">
+        ✨ NỘP TOÀN BỘ PHIẾU
+      </button>
+      <button onclick="randomizeCurrentLevel()" type="button" class="btn-3d w-full sm:w-68 py-3.5 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-baloo font-extrabold text-lg rounded-2xl shadow-[0_5px_0_#4338ca] cursor-pointer flex items-center justify-center gap-1.5 px-4">
+        <span>🎲</span> ĐỔI ĐỀ MỚI LUYỆN THÊM
+      </button>
+      <button onclick="resetLevel()" type="button" class="btn-3d w-full sm:w-52 py-3.5 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-baloo font-extrabold text-lg rounded-2xl shadow-[0_5px_0_#c2410c] cursor-pointer">
+        🔄 LÀM LẠI
+      </button>
+    </div>
+    <div id="msg-grader" class="text-center font-baloo font-extrabold text-lg mt-2"></div>
+    <div id="diag-level-summary" class="hidden max-w-3xl mx-auto mt-3 bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 text-xs sm:text-sm text-slate-800 space-y-1.5 shadow-sm"></div>`;
+}
+
+function getHTML_LV1() {
+  if (typeof window.LESSON_DATA === 'undefined') return '<div class="p-10 text-center font-baloo text-2xl text-rose-600">Dữ liệu chưa tải xong!</div>';
+  const data = window.LESSON_DATA.lv1;
+  const imodeNum = getEffectiveInputMode('numeric');
+  const theoryTTS = "Lý thuyết. Đặt tính theo cột dọc: viết hai số sao cho các chữ số cùng hàng thẳng cột với nhau. Tính từ phải sang trái. Cộng hàng đơn vị trước, nếu tổng từ 10 trở lên thì viết chữ số đơn vị và nhớ 1 chục lên ô nhớ trên đỉnh cột chục. Sau đó cộng hàng chục kèm thêm 1 chục nhớ.";
+  let html = getHeaderHTML(window.LESSON_DATA.title, "LV1 - Kiến thức căn bản • Kết Nối Tri Thức", 1);
+  html += `<div class="p-4 sm:p-7 md:p-8 space-y-8 bg-[#fffdf9]">`;
+  
+  html += `
+    <div class="bg-[#fffbeb] border-2 border-dashed border-[#f59e0b] rounded-3xl p-4 sm:p-5 relative">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-center">
+        <div class="lg:col-span-5 space-y-3">
+          <div class="flex flex-wrap items-center gap-2">
+            <div class="inline-block bg-gradient-to-r from-[#ec4899] to-[#f43f5e] text-white font-baloo font-extrabold text-sm sm:text-base px-4 py-1 rounded-full shadow">A. LÝ THUYẾT (Tóm tắt)</div>
+            ${renderSpeakerBtn(theoryTTS, 'Nghe bài giảng')}
+          </div>
+          <ul class="space-y-1.5 text-sm font-bold text-slate-950 leading-relaxed pl-1">
+            <li class="flex items-start gap-2"><span class="text-rose-500 font-extrabold">1.</span><span><b>Đặt tính dọc</b>: Chữ số cùng hàng thẳng cột với nhau.</span></li>
+            <li class="flex items-start gap-2"><span class="text-rose-500 font-extrabold">2.</span><span><b>Cộng Hàng đơn vị trước</b> (từ phải sang trái): 6 + 7 = 13, viết <b>3</b> rồi ghi <b>nhớ 1</b> lên <span class="text-amber-700 underline">Ô Nhớ</span> trên đỉnh cột Chục.</span></li>
+            <li class="flex items-start gap-2"><span class="text-rose-500 font-extrabold">3.</span><span><b>Cộng Hàng chục</b>: 3 + 1 = 4, thêm 1 chục nhớ bằng <b>5</b>. Viết <b>5</b>.</span></li>
+          </ul>
+
+          <div class="bg-white border-2 border-pink-300 rounded-2xl p-3 flex items-center justify-around gap-3 shadow-sm">
+            <div class="flex flex-col items-center">
+              <span class="text-xs font-baloo font-extrabold text-pink-700 mb-1">Ví dụ: 36 + 17 = 53</span>
+              <div class="vertical-math-matrix text-[10px] font-sans font-extrabold text-slate-400 uppercase">
+                <span></span><span>Chục</span><span>ĐV</span>
+              </div>
+              <div class="vertical-math-matrix mb-0.5">
+                <span class="text-[9px] font-sans font-bold text-amber-600">nhớ</span>
+                <span id="demo-carry-box" class="w-[28px] h-[28px] flex items-center justify-center font-math font-bold text-sm text-rose-600 bg-amber-50 border border-dashed border-amber-400 rounded-md"></span>
+                <span></span>
+              </div>
+              <div class="calc-box text-slate-950">
+                <div class="vertical-math-matrix"><span></span><span>3</span><span>6</span></div>
+                <div class="vertical-math-matrix border-b-2 border-slate-900 pb-0.5 my-0.5"><span class="text-xl font-bold font-sans text-rose-500">+</span><span>1</span><span>7</span></div>
+                <div class="vertical-math-matrix">
+                  <span></span>
+                  <span id="demo-tens-res" class="text-rose-600 font-extrabold">5</span>
+                  <span id="demo-ones-res" class="text-rose-600 font-extrabold">3</span>
+                </div>
+              </div>
+            </div>
+            <div class="text-xs font-bold text-slate-800 space-y-1 bg-sky-50 p-2.5 rounded-xl border border-dashed border-sky-300">
+              <p>• <b>Bước 1 (ĐV):</b> 6 + 7 = 13, viết <b>3</b>.</p>
+              <p>• <b>Bước 2 (Nhớ):</b> Gộp 10 ĐV thành <b>1 chục</b> ghi vào Ô Nhớ.</p>
+              <p>• <b>Bước 3 (Chục):</b> 3 + 1 + 1 = <b>5</b>.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="lg:col-span-7 bg-white border-2 border-sky-300 rounded-3xl p-4 shadow-sm space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-sky-100 pb-2">
+            <div class="font-baloo font-extrabold text-sm sm:text-base text-sky-900 flex items-center gap-1.5">
+              <span>🧱</span> Mô hình Khối Lập Phương (36 + 17)
+            </div>
+            <button id="btn-cra-regroup" type="button" onclick="if(typeof toggleBase10Regroup === 'function') toggleBase10Regroup()"
+              class="btn-3d px-3.5 py-1.5 rounded-xl font-baloo font-extrabold text-xs bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white shadow-sm cursor-pointer flex items-center gap-1">
+              <span>✨</span> Gộp 10 đơn vị thành 1 chục
+            </button>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div class="bg-sky-50/70 border-2 border-sky-200 rounded-2xl p-3 flex flex-col justify-between">
+              <div class="text-center font-baloo font-extrabold text-xs text-sky-800 uppercase border-b border-sky-200 pb-1">
+                CỘT CHỤC (Mỗi thanh = 10)
+              </div>
+              <div class="py-2 flex flex-wrap items-center justify-center gap-2 min-h-[120px]">
+                <div class="flex gap-1 items-center bg-white px-2 py-1.5 rounded-xl border border-sky-200" title="3 chục (30)">
+                  <svg viewBox="0 0 14 52" class="w-3.5 h-12 shrink-0 drop-shadow-sm"><rect x="1" y="1" width="12" height="5" fill="#0284c7" stroke="#0369a1" stroke-width="0.8"/><rect x="1" y="6" width="12" height="5" fill="#0284c7" stroke="#0369a1" stroke-width="0.8"/><rect x="1" y="11" width="12" height="5" fill="#0284c7" stroke="#0369a1" stroke-width="0.8"/><rect x="1" y="16" width="12" height="5" fill="#0284c7" stroke="#0369a1" stroke-width="0.8"/><rect x="1" y="21" width="12" height="5" fill="#0284c7" stroke="#0369a1" stroke-width="0.8"/><rect x="1" y="26" width="12" height="5" fill="#0284c7" stroke="#0369a1" stroke-width="0.8"/><rect x="1" y="31" width="12" height="5" fill="#0284c7" stroke="#0369a1" stroke-width="0.8"/><rect x="1" y="36" width="12" height="5" fill="#0284c7" stroke="#0369a1" stroke-width="0.8"/><rect x="1" y="41" width="12" height="5" fill="#0284c7" stroke="#0369a1" stroke-width="0.8"/><rect x="1" y="46" width="12" height="5" fill="#0284c7" stroke="#0369a1" stroke-width="0.8"/></svg>
+                  <svg viewBox="0 0 14 52" class="w-3.5 h-12 shrink-0 drop-shadow-sm"><rect x="1" y="1" width="12" height="5" fill="#0284c7" stroke="#0369a1" stroke-width="0.8"/><rect x="1" y="6" width="12" height="5" fill="#0284c7" stroke="#0369a1" stroke-width="0.8"/><rect x="1" y="11" width="12" height="5" fill="#0284c7" stroke="#0369a1" stroke-width="0.8"/><rect x="1" y="16" width="12" height="5" fill="#0284c7" stroke="#0369a1" stroke-width="0.8"/><rect x="1" y="21" width="12" height="5" fill="#0284c7" stroke="#0369a1" stroke-width="0.8"/><rect x="1" y="26" width="12" height="5" fill="#0284c7" stroke="#0369a1" stroke-width="0.8"/><rect x="1" y="31" width="12" height="5" fill="#0284c7" stroke="#0369a1" stroke-width="0.8"/><rect x="1" y="36" width="12" height="5" fill="#0284c7" stroke="#0369a1" stroke-width="0.8"/><rect x="1" y="41" width="12" height="5" fill="#0284c7" stroke="#0369a1" stroke-width="0.8"/><rect x="1" y="46" width="12" height="5" fill="#0284c7" stroke="#0369a1" stroke-width="0.8"/></svg>
+                  <svg viewBox="0 0 14 52" class="w-3.5 h-12 shrink-0 drop-shadow-sm"><rect x="1" y="1" width="12" height="5" fill="#0284c7" stroke="#0369a1" stroke-width="0.8"/><rect x="1" y="6" width="12" height="5" fill="#0284c7" stroke="#0369a1" stroke-width="0.8"/><rect x="1" y="11" width="12" height="5" fill="#0284c7" stroke="#0369a1" stroke-width="0.8"/><rect x="1" y="16" width="12" height="5" fill="#0284c7" stroke="#0369a1" stroke-width="0.8"/><rect x="1" y="21" width="12" height="5" fill="#0284c7" stroke="#0369a1" stroke-width="0.8"/><rect x="1" y="26" width="12" height="5" fill="#0284c7" stroke="#0369a1" stroke-width="0.8"/><rect x="1" y="31" width="12" height="5" fill="#0284c7" stroke="#0369a1" stroke-width="0.8"/><rect x="1" y="36" width="12" height="5" fill="#0284c7" stroke="#0369a1" stroke-width="0.8"/><rect x="1" y="41" width="12" height="5" fill="#0284c7" stroke="#0369a1" stroke-width="0.8"/><rect x="1" y="46" width="12" height="5" fill="#0284c7" stroke="#0369a1" stroke-width="0.8"/></svg>
+                </div>
+                <div class="flex gap-1 items-center bg-white px-2 py-1.5 rounded-xl border border-sky-200" title="1 chục (10)">
+                  <svg viewBox="0 0 14 52" class="w-3.5 h-12 shrink-0 drop-shadow-sm"><rect x="1" y="1" width="12" height="5" fill="#0ea5e9" stroke="#0284c7" stroke-width="0.8"/><rect x="1" y="6" width="12" height="5" fill="#0ea5e9" stroke="#0284c7" stroke-width="0.8"/><rect x="1" y="11" width="12" height="5" fill="#0ea5e9" stroke="#0284c7" stroke-width="0.8"/><rect x="1" y="16" width="12" height="5" fill="#0ea5e9" stroke="#0284c7" stroke-width="0.8"/><rect x="1" y="21" width="12" height="5" fill="#0ea5e9" stroke="#0284c7" stroke-width="0.8"/><rect x="1" y="26" width="12" height="5" fill="#0ea5e9" stroke="#0284c7" stroke-width="0.8"/><rect x="1" y="31" width="12" height="5" fill="#0ea5e9" stroke="#0284c7" stroke-width="0.8"/><rect x="1" y="36" width="12" height="5" fill="#0ea5e9" stroke="#0284c7" stroke-width="0.8"/><rect x="1" y="41" width="12" height="5" fill="#0ea5e9" stroke="#0284c7" stroke-width="0.8"/><rect x="1" y="46" width="12" height="5" fill="#0ea5e9" stroke="#0284c7" stroke-width="0.8"/></svg>
+                </div>
+                <div id="cra-new-ten-rod" class="hidden flex-col items-center bg-rose-50 px-2 py-1 rounded-xl border-2 border-rose-400 shadow-sm" title="+1 chục nhớ (10)">
+                  <svg viewBox="0 0 14 52" class="w-3.5 h-12 shrink-0 drop-shadow-sm"><rect x="1" y="1" width="12" height="5" fill="#f43f5e" stroke="#be123c" stroke-width="0.8"/><rect x="1" y="6" width="12" height="5" fill="#f43f5e" stroke="#be123c" stroke-width="0.8"/><rect x="1" y="11" width="12" height="5" fill="#f43f5e" stroke="#be123c" stroke-width="0.8"/><rect x="1" y="16" width="12" height="5" fill="#f43f5e" stroke="#be123c" stroke-width="0.8"/><rect x="1" y="21" width="12" height="5" fill="#f43f5e" stroke="#be123c" stroke-width="0.8"/><rect x="1" y="26" width="12" height="5" fill="#f43f5e" stroke="#be123c" stroke-width="0.8"/><rect x="1" y="31" width="12" height="5" fill="#f43f5e" stroke="#be123c" stroke-width="0.8"/><rect x="1" y="36" width="12" height="5" fill="#f43f5e" stroke="#be123c" stroke-width="0.8"/><rect x="1" y="41" width="12" height="5" fill="#f43f5e" stroke="#be123c" stroke-width="0.8"/><rect x="1" y="46" width="12" height="5" fill="#f43f5e" stroke="#be123c" stroke-width="0.8"/></svg>
+                  <span class="text-[9px] font-baloo font-extrabold text-rose-600 mt-0.5">+1 chục nhớ</span>
+                </div>
+              </div>
+              <div class="text-center text-xs font-bold text-sky-900 bg-white rounded-lg py-1 border border-sky-200">
+                3 chục + 1 chục (+ 1 nhớ)
+              </div>
+            </div>
+
+            <div class="bg-amber-50/70 border-2 border-amber-200 rounded-2xl p-3 flex flex-col justify-between">
+              <div class="text-center font-baloo font-extrabold text-xs text-amber-800 uppercase border-b border-amber-200 pb-1">
+                CỘT ĐƠN VỊ (6 + 7 = 13 khối lẻ)
+              </div>
+              <div class="py-2 flex flex-col items-center justify-center gap-2 min-h-[120px]">
+                <div id="cra-grouped-ones-box" class="p-1.5 rounded-xl border-2 border-dashed border-rose-400 bg-rose-50/80 transition-all duration-500 flex flex-wrap gap-1 items-center justify-center">
+                  <span class="w-full text-center text-[10px] font-baloo font-extrabold text-rose-600">Gộp 6 + 4 = 10 đơn vị:</span>
+                  <svg viewBox="0 0 14 14" class="w-3.5 h-3.5 shrink-0 drop-shadow-sm"><rect x="1" y="1" width="12" height="12" rx="2" fill="#facc15" stroke="#ca8a04" stroke-width="1.2"/></svg>
+                  <svg viewBox="0 0 14 14" class="w-3.5 h-3.5 shrink-0 drop-shadow-sm"><rect x="1" y="1" width="12" height="12" rx="2" fill="#facc15" stroke="#ca8a04" stroke-width="1.2"/></svg>
+                  <svg viewBox="0 0 14 14" class="w-3.5 h-3.5 shrink-0 drop-shadow-sm"><rect x="1" y="1" width="12" height="12" rx="2" fill="#facc15" stroke="#ca8a04" stroke-width="1.2"/></svg>
+                  <svg viewBox="0 0 14 14" class="w-3.5 h-3.5 shrink-0 drop-shadow-sm"><rect x="1" y="1" width="12" height="12" rx="2" fill="#facc15" stroke="#ca8a04" stroke-width="1.2"/></svg>
+                  <svg viewBox="0 0 14 14" class="w-3.5 h-3.5 shrink-0 drop-shadow-sm"><rect x="1" y="1" width="12" height="12" rx="2" fill="#facc15" stroke="#ca8a04" stroke-width="1.2"/></svg>
+                  <svg viewBox="0 0 14 14" class="w-3.5 h-3.5 shrink-0 drop-shadow-sm"><rect x="1" y="1" width="12" height="12" rx="2" fill="#facc15" stroke="#ca8a04" stroke-width="1.2"/></svg>
+                  <svg viewBox="0 0 14 14" class="w-3.5 h-3.5 shrink-0 drop-shadow-sm"><rect x="1" y="1" width="12" height="12" rx="2" fill="#fb923c" stroke="#c2410c" stroke-width="1.2"/></svg>
+                  <svg viewBox="0 0 14 14" class="w-3.5 h-3.5 shrink-0 drop-shadow-sm"><rect x="1" y="1" width="12" height="12" rx="2" fill="#fb923c" stroke="#c2410c" stroke-width="1.2"/></svg>
+                  <svg viewBox="0 0 14 14" class="w-3.5 h-3.5 shrink-0 drop-shadow-sm"><rect x="1" y="1" width="12" height="12" rx="2" fill="#fb923c" stroke="#c2410c" stroke-width="1.2"/></svg>
+                  <svg viewBox="0 0 14 14" class="w-3.5 h-3.5 shrink-0 drop-shadow-sm"><rect x="1" y="1" width="12" height="12" rx="2" fill="#fb923c" stroke="#c2410c" stroke-width="1.2"/></svg>
+                </div>
+                <div class="flex items-center gap-1 bg-white px-2.5 py-1 rounded-xl border border-amber-300">
+                  <span class="text-[10px] font-bold text-slate-600 mr-1">Còn lẻ 3:</span>
+                  <svg viewBox="0 0 14 14" class="w-3.5 h-3.5 shrink-0 drop-shadow-sm"><rect x="1" y="1" width="12" height="12" rx="2" fill="#fb923c" stroke="#c2410c" stroke-width="1.2"/></svg>
+                  <svg viewBox="0 0 14 14" class="w-3.5 h-3.5 shrink-0 drop-shadow-sm"><rect x="1" y="1" width="12" height="12" rx="2" fill="#fb923c" stroke="#c2410c" stroke-width="1.2"/></svg>
+                  <svg viewBox="0 0 14 14" class="w-3.5 h-3.5 shrink-0 drop-shadow-sm"><rect x="1" y="1" width="12" height="12" rx="2" fill="#fb923c" stroke="#c2410c" stroke-width="1.2"/></svg>
+                </div>
+              </div>
+              <div class="text-center text-xs font-bold text-amber-900 bg-white rounded-lg py-1 border border-amber-200">
+                13 đơn vị = 1 chục + 3 đơn vị
+              </div>
+            </div>
+          </div>
+
+          <div id="cra-status-text" class="text-xs font-bold text-slate-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-center">
+            💡 Cột Đơn vị có <b>6 + 7 = 13 khối lẻ</b> (vượt quá 10). Bé hãy bấm nút để gộp <b>10 khối lẻ</b> thành <b>1 thanh chục</b> nhé!
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  html += `
+    <section id="sec-lv1_ex1" class="space-y-4">
+      <div class="flex flex-wrap items-center gap-2.5">
+        <span class="w-8 h-8 rounded-full bg-rose-500 text-white font-baloo font-extrabold flex items-center justify-center text-sm shadow">1</span>
+        <div class="bg-rose-50 border border-rose-200 text-rose-800 font-baloo font-extrabold text-base sm:text-lg px-4 py-1 rounded-full">Tính (theo cột dọc từ phải sang trái • Nhớ điền số 1 vào Ô Nhớ).</div>
+        ${renderSpeakerBtn('Bài 1. Tính theo cột dọc. Bé hãy gõ chữ số hàng đơn vị ở bên phải trước, rồi gõ số 1 vào ô nhớ màu cam, sau đó gõ chữ số hàng chục nhé.', 'Nghe hướng dẫn')}
+      </div>
+      <div class="bg-rose-50/40 rounded-3xl p-3 sm:p-5 border-2 border-dashed border-rose-200 space-y-3">
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 sm:gap-4">
+          ${data.ex1.map((item, idx) => renderStandardVerticalCard(item, `lv1_ex1_${idx}`)).join('')}
+        </div>
+        ${renderSectionControlBar('lv1_ex1')}
+      </div>
+    </section>`;
+
+  html += `
+    <section id="sec-lv1_ex2" class="space-y-4">
+      <div class="flex flex-wrap items-center gap-2.5">
+        <span class="w-8 h-8 rounded-full bg-emerald-500 text-white font-baloo font-extrabold flex items-center justify-center text-sm shadow">2</span>
+        <div class="bg-emerald-50 border border-emerald-200 text-emerald-800 font-baloo font-extrabold text-base sm:text-lg px-4 py-1 rounded-full">Tính nhẩm (theo mẫu Bài 20 SGK).</div>
+        ${renderSpeakerBtn('Bài 2. Tính nhẩm. Bé hãy vận dụng cách cộng nhẩm qua số tròn chục, tính chất giao hoán và gộp ba số hạng để điền kết quả nhé.', 'Nghe yêu cầu')}
+      </div>
+      <div class="bg-emerald-50/40 rounded-3xl p-3 sm:p-5 border-2 border-dashed border-emerald-200 space-y-3">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          ${data.ex2.map((group, gIdx) => {
+            const t = THEMES[group.theme];
+            return `<div class="${t.bg} border-2 ${t.border} rounded-2xl p-4 shadow-sm space-y-3.5">
+              <div class="text-xs font-extrabold ${t.text} uppercase tracking-wider border-b ${t.lightBorder} pb-1 text-center">${group.groupTitle}</div>
+              <div class="space-y-3">
+                ${group.items.map((it, iIdx) => `
+                  <div data-prob-id="lv1_ex2_${gIdx}_${iIdx}" class="relative">
+                    <div class="mental-math-grid font-baloo text-lg sm:text-xl font-bold text-slate-950">
+                      <span class="w-full text-right pr-1 whitespace-nowrap font-math">${it.c1}</span>
+                      <span class="${t.text} font-extrabold text-center">${it.op}</span>
+                      <span class="w-full text-center font-math">${it.c2}</span>
+                      <span class="${t.text} font-extrabold text-center">${it.eq}</span>
+                      <input type="text" inputmode="${imodeNum}" maxlength="2" data-type="num" data-ans="${it.ans}"
+                        class="lvl-input w-14 h-9 text-center font-math font-bold ${t.text} bg-white border border-dashed ${t.lightBorder} rounded-xl focus:outline-none shadow-inner transition-colors duration-200" />
+                    </div>
+                    <span class="prob-star-badge hidden absolute -right-2 -top-2 text-[10px] font-baloo font-extrabold text-amber-600 bg-amber-100 px-1.5 rounded-full shadow-sm">+2⭐</span>
+                  </div>
+                `).join('')}
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+        ${renderSectionControlBar('lv1_ex2')}
+      </div>
+    </section>`;
+
+  html += `
+    <section id="sec-lv1_ex3" class="space-y-4">
+      <div class="flex flex-wrap items-center gap-2.5">
+        <span class="w-8 h-8 rounded-full bg-amber-500 text-white font-baloo font-extrabold flex items-center justify-center text-sm shadow">3</span>
+        <div class="bg-amber-50 border border-amber-200 text-amber-800 font-baloo font-extrabold text-base sm:text-lg px-4 py-1 rounded-full">Giải bài toán theo tranh vẽ.</div>
+        ${renderSpeakerBtn('Bài 3. Giải bài toán theo tranh vẽ. Bé đọc tóm tắt rồi điền số hạng, dấu phép tính và tổng vào 4 ô trên dòng phép tính nhé.', 'Nghe yêu cầu')}
+      </div>
+      <div class="flex flex-col gap-6">
+        ${data.ex3.map((item, idx) => {
+          const t = THEMES[item.theme];
+          return `<div data-prob-id="lv1_ex3_${idx}" class="${t.bg} rounded-3xl p-5 border-2 ${t.border} shadow-sm space-y-3.5 relative">
+            <div class="flex items-start gap-4">
+              <div class="w-20 h-20 shrink-0 bg-white rounded-2xl border-2 ${t.lightBorder} p-1 flex items-center justify-center shadow-inner"><svg viewBox="0 0 80 80" class="w-full h-full">${item.imgSvg}</svg></div>
+              <div class="flex-1">
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="text-xs font-bold ${t.text} bg-white border ${t.lightBorder} px-3 py-0.5 rounded-full">${item.label}</span>
+                  ${renderSpeakerBtn(item.ttsText, 'Nghe đề bài')}
+                  <span class="prob-star-badge hidden text-xs font-baloo font-extrabold text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">+2⭐</span>
+                </div>
+                <p class="font-bold text-slate-950 text-base mt-1.5 leading-relaxed">${item.desc}</p>
+              </div>
+            </div>
+            ${renderStructuredWordProblemSolution(item)}
+          </div>`;
+        }).join('')}
+        ${renderSectionControlBar('lv1_ex3')}
+      </div>
+    </section>`;
+    
+  html += getFooterButtons();
+  html += `</div>`;
+  return html;
+}
+
+function getHTML_LV2() {
+  if (typeof window.LESSON_DATA === 'undefined') return '<div class="p-10 text-center font-baloo text-2xl text-rose-600">Dữ liệu chưa tải xong!</div>';
+  const data = window.LESSON_DATA.lv2;
+  let html = getHeaderHTML(window.LESSON_DATA.title, "LV2 - Nâng cao kỹ năng • Giải toán bằng lời văn (6 bài)", 2);
+  html += `<div class="p-4 sm:p-7 md:p-8 space-y-8 bg-[#fffdf9]">`;
+  html += `<section id="sec-lv2_all" class="space-y-5">`;
+  html += `<div class="grid grid-cols-1 md:grid-cols-2 gap-5">`;
+  html += data.problems.map((p, idx) => {
+    const t = THEMES[p.theme];
+    return `
+      <div data-prob-id="lv2_prob_${idx}" class="bg-white border-2 ${t.border} rounded-3xl p-4 shadow flex flex-col justify-between gap-3 relative">
+        <div class="grid grid-cols-12 gap-2 items-center">
+          <div class="col-span-8 flex items-start gap-2.5">
+            <span class="w-9 h-9 rounded-full text-white font-baloo font-extrabold text-xl flex items-center justify-center shrink-0 shadow" style="background-color:${t.fill}">${p.id}</span>
+            <div class="space-y-1">
+              <div class="flex items-center gap-2">
+                ${renderSpeakerBtn(p.ttsText, 'Nghe đề bài')}
+                <span class="prob-star-badge hidden text-xs font-baloo font-extrabold text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">+2⭐</span>
+              </div>
+              <div class="text-sm font-bold text-slate-950 leading-relaxed pt-0.5">${p.desc}</div>
+            </div>
+          </div>
+          <div class="col-span-4 h-24 flex items-center justify-center"><svg viewBox="0 0 80 70" class="w-full h-full">${p.imgSvg}</svg></div>
+        </div>
+        <div class="space-y-2.5">
+          ${renderStructuredWordProblemSolution(p)}
+        </div>
+      </div>`;
+  }).join('');
+  html += `</div>`;
+  html += renderSectionControlBar('lv2_all');
+  html += `</section>`;
+  html += getFooterButtons();
+  html += `</div>`;
+  return html;
+}
+
+function getHTML_LV3() {
+  if (typeof window.LESSON_DATA === 'undefined') return '<div class="p-10 text-center font-baloo text-2xl text-rose-600">Dữ liệu chưa tải xong!</div>';
+  const data = window.LESSON_DATA.lv3;
+  let html = getHeaderHTML(window.LESSON_DATA.title, "LV3 - Bài tập nâng cao • Tính dọc có Ô Nhớ & Giải mã chữ số", 3);
+  html += `<div class="p-4 sm:p-7 md:p-8 space-y-8 bg-[#fffdf9]">`;
+  
+  html += `
+    <section id="sec-lv3_ex1" class="space-y-4">
+      <div class="flex flex-wrap items-center gap-2.5">
+        <span class="w-8 h-8 rounded-full bg-rose-500 text-white font-baloo font-extrabold flex items-center justify-center text-sm shadow">1</span>
+        <div class="bg-rose-50 border border-rose-200 text-rose-800 font-baloo font-extrabold text-base sm:text-lg px-4 py-1 rounded-full">Tính (theo cột dọc có Ô Nhớ từ phải sang trái).</div>
+        ${renderSpeakerBtn('Bài 1. Tính theo cột dọc trên giấy ô ly. Bé nhập chữ số hàng đơn vị trước, rồi nhập số 1 vào ô nhớ và chữ số hàng chục nhé.', 'Nghe yêu cầu')}
+      </div>
+      <div class="bg-rose-50/40 rounded-3xl p-3 sm:p-5 border-2 border-dashed border-rose-200 space-y-3">
+        <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4">
+          ${data.ex1.map((item, idx) => renderStandardVerticalCard(item, `lv3_ex1_${idx}`)).join('')}
+        </div>
+        ${renderSectionControlBar('lv3_ex1')}
+      </div>
+    </section>`;
+
+  html += `
+    <section id="sec-lv3_ex2" class="space-y-4">
+      <div class="flex flex-wrap items-center gap-2.5">
+        <span class="w-8 h-8 rounded-full bg-sky-500 text-white font-baloo font-extrabold flex items-center justify-center text-sm shadow">2</span>
+        <div class="bg-sky-50 border border-sky-200 text-sky-900 font-baloo font-extrabold text-base sm:text-lg px-4 py-1 rounded-full">Tìm chữ số bị giấu ở cột sau (Hàng đơn vị).</div>
+        ${renderSpeakerBtn('Bài 2. Tìm chữ số bị giấu ở cột sau, hàng đơn vị. Chú ý ở câu b và câu e, bé có thể chọn hai chữ số bất kỳ sao cho tổng của chúng bằng 10 cộng chữ số đơn vị của kết quả nhé.', 'Nghe yêu cầu')}
+      </div>
+      <div class="bg-sky-50/40 rounded-3xl p-3 sm:p-5 border-2 border-dashed border-sky-200 space-y-3">
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 sm:gap-4">
+          ${data.ex2.map((item, idx) => renderVerticalPuzzleCard(item, `lv3_ex2_${idx}`)).join('')}
+        </div>
+        ${renderSectionControlBar('lv3_ex2')}
+      </div>
+    </section>`;
+
+  html += `
+    <section id="sec-lv3_ex3" class="space-y-4">
+      <div class="flex flex-wrap items-center gap-2.5">
+        <span class="w-8 h-8 rounded-full bg-emerald-500 text-white font-baloo font-extrabold flex items-center justify-center text-sm shadow">3</span>
+        <div class="bg-emerald-50 border border-emerald-200 text-emerald-900 font-baloo font-extrabold text-base sm:text-lg px-4 py-1 rounded-full">Tìm chữ số bị giấu ở cột đầu (Hàng chục).</div>
+        ${renderSpeakerBtn('Bài 3. Tìm chữ số bị giấu ở cột đầu, hàng chục. Bé nhớ trừ đi 1 chục nhớ từ hàng đơn vị sang nhé.', 'Nghe yêu cầu')}
+      </div>
+      <div class="bg-emerald-50/40 rounded-3xl p-3 sm:p-5 border-2 border-dashed border-emerald-200 space-y-3">
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 sm:gap-4">
+          ${data.ex3.map((item, idx) => renderVerticalPuzzleCard(item, `lv3_ex3_${idx}`)).join('')}
+        </div>
+        ${renderSectionControlBar('lv3_ex3')}
+      </div>
+    </section>`;
+
+  html += `
+    <section id="sec-lv3_ex4" class="space-y-4">
+      <div class="flex flex-wrap items-center gap-2.5">
+        <span class="w-8 h-8 rounded-full bg-amber-500 text-white font-baloo font-extrabold flex items-center justify-center text-sm shadow">4</span>
+        <div class="bg-amber-50 border border-amber-200 text-amber-900 font-baloo font-extrabold text-base sm:text-lg px-4 py-1 rounded-full">Tìm chữ số bị giấu ở cột hỗn hợp (Kết hợp trước và sau).</div>
+        ${renderSpeakerBtn('Bài 4. Tìm chữ số bị giấu ở cột hỗn hợp, kết hợp trước và sau. Bé tìm chữ số ở hàng đơn vị trước rồi mới tìm chữ số ở hàng chục nhé.', 'Nghe yêu cầu')}
+      </div>
+      <div class="bg-amber-50/40 rounded-3xl p-3 sm:p-5 border-2 border-dashed border-amber-200 space-y-3">
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 sm:gap-4">
+          ${data.ex4.map((item, idx) => renderVerticalPuzzleCard(item, `lv3_ex4_${idx}`)).join('')}
+        </div>
+        ${renderSectionControlBar('lv3_ex4')}
+      </div>
+    </section>`;
+
+  html += getFooterButtons();
+  html += `</div>`;
+  return html;
+}
+</script>

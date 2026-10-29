@@ -1,0 +1,1159 @@
+<script>
+// ============================================================================
+// KHỐI SCRIPT_LOGIC: DỮ LIỆU GỐC, ĐỒNG BỘ GOOGLE SHEETS & BỘ MÁY CHẤM ĐIỂM
+// ============================================================================
+
+const THEME_KEYS = ['pink', 'blue', 'yellow', 'green', 'purple', 'orange'];
+
+// 1. DỮ LIỆU GỐC CHUẨN (Đảm bảo hiển thị tức thì và làm khung ghép dữ liệu từ Google Sheets)
+window.LESSON_DATA = {
+  id: "toan_b20",
+  title: "BÀI 20: PHÉP CỘNG (CÓ NHỚ) SỐ CÓ HAI CHỮ SỐ VỚI SỐ CÓ HAI CHỮ SỐ",
+  lv1: {
+    ex1: [
+      { l: 'a)', n1: 28, n2: 45, op: '+', ans: 73, theme: 'pink' },
+      { l: 'b)', n1: 36, n2: 27, op: '+', ans: 63, theme: 'blue' },
+      { l: 'c)', n1: 59, n2: 18, op: '+', ans: 77, theme: 'yellow' },
+      { l: 'd)', n1: 64, n2: 29, op: '+', ans: 93, theme: 'green' },
+      { l: 'e)', n1: 47, n2: 36, op: '+', ans: 83, theme: 'purple' },
+      { l: 'g)', n1: 58, n2: 24, op: '+', ans: 82, theme: 'orange' }
+    ],
+    ex2: [
+      { groupTitle: "DẠNG 1: CỘNG QUA SỐ TRÒN CHỤC", theme: "pink",
+        items: [
+          { c1: "26", op: "+", c2: "4",  eq: "=", ans: 30 },
+          { c1: "26", op: "+", c2: "14", eq: "=", ans: 40 },
+          { c1: "26", op: "+", c2: "15", eq: "=", ans: 41 }
+        ]
+      },
+      { groupTitle: "DẠNG 2: TÍNH CHẤT GIAO HOÁN", theme: "blue",
+        items: [
+          { c1: "47", op: "+", c2: "43", eq: "=", ans: 90 },
+          { c1: "43", op: "+", c2: "47", eq: "=", ans: 90 },
+          { c1: "65", op: "+", c2: "28", eq: "=", ans: 93 }
+        ]
+      },
+      { groupTitle: "DẠNG 3: GỘP 3 SỐ TRÒN CHỤC", theme: "yellow",
+        items: [
+          { c1: "23 + 27", op: "+", c2: "5", eq: "=", ans: 55 },
+          { c1: "38 + 12", op: "+", c2: "9", eq: "=", ans: 59 },
+          { c1: "46 + 14", op: "+", c2: "7", eq: "=", ans: 67 }
+        ]
+      }
+    ],
+    ex3: [
+      { 
+        label: 'Bài toán a', theme: 'yellow',
+        desc: 'Một đàn gà có <strong>28 con gà mái</strong> và <strong>17 con gà trống</strong>. Hỏi đàn gà có tất cả bao nhiêu con gà?',
+        ttsText: 'Bài toán a. Một đàn gà có 28 con gà mái và 17 con gà trống. Hỏi đàn gà có tất cả bao nhiêu con gà?',
+        tomTat: 'Gà mái: <b>28 con</b> &nbsp;|&nbsp; Gà trống: <b>17 con</b> &nbsp;|&nbsp; Tất cả: <b>... con gà?</b>',
+        solveTxt: 'Số con gà đàn gà có tất cả là:',
+        n1: 28, op: '+', n2: 17, ansNum: 45, unit1: '(con gà)', unit2: 'con gà',
+        imgSvg: '<circle cx="36" cy="44" r="20" fill="#facc15"/><circle cx="48" cy="30" r="11" fill="#facc15"/><polygon points="56,30 64,33 56,36" fill="#f97316"/><circle cx="50" cy="28" r="2" fill="#000"/><polygon points="46,18 50,12 53,18 57,12 60,19" fill="#ef4444"/><circle cx="22" cy="58" r="8" fill="#fef08a"/><polygon points="14,58 9,60 14,62" fill="#f97316"/>'
+      },
+      { 
+        label: 'Bài toán b', theme: 'pink',
+        desc: 'Trong hộp có <strong>36 chiếc kẹo dâu</strong> và <strong>28 chiếc kẹo cam</strong>. Hỏi trong hộp có tất cả bao nhiêu chiếc kẹo?',
+        ttsText: 'Bài toán b. Trong hộp có 36 chiếc kẹo dâu và 28 chiếc kẹo cam. Hỏi trong hộp có tất cả bao nhiêu chiếc kẹo?',
+        tomTat: 'Kẹo dâu: <b>36 chiếc</b> &nbsp;|&nbsp; Kẹo cam: <b>28 chiếc</b> &nbsp;|&nbsp; Tất cả: <b>... chiếc kẹo?</b>',
+        solveTxt: 'Số chiếc kẹo trong hộp có tất cả là:',
+        n1: 36, op: '+', n2: 28, ansNum: 64, unit1: '(chiếc kẹo)', unit2: 'chiếc kẹo',
+        imgSvg: '<rect x="24" y="24" width="32" height="42" rx="10" fill="#fbcfe8" stroke="#f472b6" stroke-width="2"/><rect x="28" y="16" width="24" height="8" rx="3" fill="#ec4899"/><circle cx="34" cy="40" r="5" fill="#f59e0b"/><circle cx="46" cy="44" r="5" fill="#06b6d4"/><circle cx="38" cy="54" r="5" fill="#10b981"/>'
+      }
+    ]
+  },
+  lv2: {
+    problems: [
+      { id: 1, theme: 'pink', desc: 'Trong hộp có <strong>38 chiếc kẹo</strong> vị cam. Lan bỏ thêm vào hộp <strong>25 chiếc kẹo</strong> vị dâu. Hỏi trong hộp có tất cả bao nhiêu chiếc kẹo?', ttsText: 'Bài 1. Trong hộp có 38 chiếc kẹo vị cam. Lan bỏ thêm vào hộp 25 chiếc kẹo vị dâu. Hỏi trong hộp có tất cả bao nhiêu chiếc kẹo?', tomTat: 'Có: <b>38 chiếc kẹo</b> &nbsp;|&nbsp; Thêm: <b>25 chiếc kẹo</b> &nbsp;|&nbsp; Tất cả: <b>... chiếc kẹo?</b>', solveTxt: 'Số chiếc kẹo trong hộp có tất cả là:', n1: 38, op: '+', n2: 25, ansNum: 63, unit1: '(chiếc kẹo)', unit2: 'chiếc kẹo', imgSvg: '<rect x="18" y="18" width="34" height="44" rx="8" fill="#E0F2FE" stroke="#4A2511" stroke-width="2.5"/><rect x="22" y="10" width="26" height="10" rx="3" fill="#F472B6" stroke="#4A2511" stroke-width="2.5"/><circle cx="28" cy="34" r="5" fill="#EF4444"/><circle cx="42" cy="40" r="5" fill="#3B82F6"/><circle cx="32" cy="50" r="5" fill="#FACC15"/>' },
+      { id: 2, theme: 'blue', desc: 'Bác An nuôi <strong>29 con gà trống</strong> và <strong>18 con gà mái</strong>. Hỏi bác An nuôi tất cả bao nhiêu con gà?', ttsText: 'Bài 2. Bác An nuôi 29 con gà trống và 18 con gà mái. Hỏi bác An nuôi tất cả bao nhiêu con gà?', tomTat: 'Gà trống: <b>29 con</b> &nbsp;|&nbsp; Gà mái: <b>18 con</b> &nbsp;|&nbsp; Tất cả: <b>... con gà?</b>', solveTxt: 'Số con gà bác An nuôi tất cả là:', n1: 29, op: '+', n2: 18, ansNum: 47, unit1: '(con gà)', unit2: 'con gà', imgSvg: '<circle cx="34" cy="40" r="16" fill="#FACC15" stroke="#4A2511" stroke-width="2.2"/><circle cx="44" cy="28" r="9" fill="#FACC15" stroke="#4A2511" stroke-width="2.2"/><polygon points="50,28 58,31 50,34" fill="#F97316"/><polygon points="42,18 45,12 48,18" fill="#EF4444"/>' },
+      { id: 3, theme: 'green', desc: 'Bình có <strong>26 quyển sách</strong>. An có nhiều hơn Bình <strong>17 quyển sách</strong>. Hỏi An có bao nhiêu quyển sách?', ttsText: 'Bài 3. Bình có 26 quyển sách. An có nhiều hơn Bình 17 quyển sách. Hỏi An có bao nhiêu quyển sách?', tomTat: 'Bình có: <b>26 quyển</b> &nbsp;|&nbsp; An nhiều hơn: <b>17 quyển</b> &nbsp;|&nbsp; An có: <b>... quyển sách?</b>', solveTxt: 'Số quyển sách bạn An có là:', n1: 26, op: '+', n2: 17, ansNum: 43, unit1: '(quyển sách)', unit2: 'quyển sách', imgSvg: '<circle cx="24" cy="28" r="14" fill="#FFE0C8" stroke="#4A2511" stroke-width="2"/><path d="M12 24 C12 8, 36 8, 36 24 Z" fill="#6E3B1E"/><circle cx="76" cy="28" r="14" fill="#FFE0C8" stroke="#4A2511" stroke-width="2"/><path d="M64 24 C64 8, 88 8, 88 24 Z" fill="#7C3F1D"/><rect x="38" y="38" width="24" height="6" rx="2" fill="#3B82F6" stroke="#4A2511" stroke-width="1.5"/><rect x="40" y="32" width="20" height="6" rx="2" fill="#EF4444" stroke="#4A2511" stroke-width="1.5"/><rect x="39" y="26" width="22" height="6" rx="2" fill="#FACC15" stroke="#4A2511" stroke-width="1.5"/>' },
+      { id: 4, theme: 'yellow', desc: 'Buổi sáng bán được <strong>28 kg táo</strong>, buổi chiều bán thêm <strong>35 kg táo</strong>. Hỏi cả hai buổi bán được bao nhiêu ki-lô-gam táo?', ttsText: 'Bài 4. Buổi sáng bán được 28 ki-lô-gam táo, buổi chiều bán thêm 35 ki-lô-gam táo. Hỏi cả hai buổi bán được bao nhiêu ki-lô-gam táo?', tomTat: 'Sáng bán: <b>28 kg</b> &nbsp;|&nbsp; Chiều bán: <b>35 kg</b> &nbsp;|&nbsp; Cả hai buổi: <b>... kg táo?</b>', solveTxt: 'Số ki-lô-gam táo cả hai buổi bán được là:', n1: 28, op: '+', n2: 35, ansNum: 63, unit1: '(kg)', unit2: 'kg táo', imgSvg: '<circle cx="25" cy="28" r="8" fill="#EF4444" stroke="#4A2511" stroke-width="1.5"/><circle cx="39" cy="28" r="8" fill="#EF4444" stroke="#4A2511" stroke-width="1.5"/><rect x="15" y="34" width="34" height="20" rx="3" fill="#F59E0B" stroke="#4A2511" stroke-width="2"/><rect x="54" y="24" width="38" height="22" rx="3" fill="#FCE7F3" stroke="#9D174D" stroke-width="1.8"/><text x="73" y="38" text-anchor="middle" fill="#9D174D" font-size="7" font-weight="bold">TÁO</text>' },
+      { id: 5, theme: 'purple', desc: 'Mai có đoạn ruy băng đỏ dài <strong>47 cm</strong> và đoạn xanh dài <strong>38 cm</strong>. Hỏi cả hai đoạn dây dài bao nhiêu xăng-ti-mét?', ttsText: 'Bài 5. Mai có đoạn ruy băng đỏ dài 47 xăng-ti-mét và đoạn xanh dài 38 xăng-ti-mét. Hỏi cả hai đoạn dây dài bao nhiêu xăng-ti-mét?', tomTat: 'Dây đỏ: <b>47 cm</b> &nbsp;|&nbsp; Dây xanh: <b>38 cm</b> &nbsp;|&nbsp; Cả hai đoạn: <b>... cm?</b>', solveTxt: 'Cả hai đoạn dây dài số xăng-ti-mét là:', n1: 47, op: '+', n2: 38, ansNum: 85, unit1: '(cm)', unit2: 'cm', imgSvg: '<path d="M10 40 Q30 25 55 35 L50 45 Q28 35 12 50 Z" fill="#EF4444" stroke="#4A2511" stroke-width="1.8"/><path d="M60 40 Q75 35 90 40 L88 48 Q74 43 58 48 Z" fill="#3B82F6" stroke="#4A2511" stroke-width="1.8"/><circle cx="68" cy="18" r="6" fill="none" stroke="#2563EB" stroke-width="2.5"/><circle cx="78" cy="24" r="6" fill="none" stroke="#2563EB" stroke-width="2.5"/>' },
+      { id: 6, theme: 'blue', desc: 'Đội Một làm được <strong>48 chiếc bánh quy</strong>, đội Hai làm được <strong>27 chiếc bánh quy</strong>. Hỏi cả hai đội làm được tất cả bao nhiêu chiếc bánh?', ttsText: 'Bài 6. Đội Một làm được 48 chiếc bánh quy, đội Hai làm được 27 chiếc bánh quy. Hỏi cả hai đội làm được tất cả bao nhiêu chiếc bánh?', tomTat: 'Đội Một: <b>48 chiếc</b> &nbsp;|&nbsp; Đội Hai: <b>27 chiếc</b> &nbsp;|&nbsp; Cả hai đội: <b>... chiếc bánh?</b>', solveTxt: 'Số chiếc bánh quy cả hai đội làm được là:', n1: 48, op: '+', n2: 27, ansNum: 75, unit1: '(chiếc bánh)', unit2: 'chiếc bánh quy', imgSvg: '<circle cx="16" cy="25" r="8" fill="#FFE0C8" stroke="#4A2511" stroke-width="1.5"/><circle cx="38" cy="25" r="8" fill="#FFE0C8" stroke="#4A2511" stroke-width="1.5"/><circle cx="60" cy="25" r="8" fill="#FFE0C8" stroke="#4A2511" stroke-width="1.5"/><circle cx="82" cy="25" r="8" fill="#FFE0C8" stroke="#4A2511" stroke-width="1.5"/><rect x="8" y="44" width="84" height="12" rx="2" fill="#FDE68A" stroke="#4A2511" stroke-width="1.5"/>' }
+    ]
+  },
+  lv3: {
+    ex1: [
+      { l: 'a)', n1: 27, n2: 15, op: '+', ans: 42, theme: 'pink' },
+      { l: 'b)', n1: 36, n2: 28, op: '+', ans: 64, theme: 'blue' },
+      { l: 'c)', n1: 48, n2: 17, op: '+', ans: 65, theme: 'yellow' },
+      { l: 'd)', n1: 59, n2: 24, op: '+', ans: 83, theme: 'green' },
+      { l: 'e)', n1: 35, n2: 19, op: '+', ans: 54, theme: 'purple' },
+      { l: 'f)', n1: 46, n2: 37, op: '+', ans: 83, theme: 'orange' },
+      { l: 'g)', n1: 58, n2: 27, op: '+', ans: 85, theme: 'blue' },
+      { l: 'h)', n1: 68, n2: 16, op: '+', ans: 84, theme: 'pink' },
+      { l: 'i)', n1: 49, n2: 38, op: '+', ans: 87, theme: 'green' },
+      { l: 'k)', n1: 28, n2: 47, op: '+', ans: 75, theme: 'yellow' }
+    ],
+    ex2: [
+      { l: 'a)', theme: 'pink',   op: '+', sum: 63, rows: [['3', {ans:8}], ['2', '5'], ['6', '3']] },
+      { l: 'b)', theme: 'blue',   op: '+', sum: 63, rows: [['3', {ans:6}], ['2', {ans:7}], ['6', '3']] },
+      { l: 'c)', theme: 'yellow', op: '+', sum: 74, rows: [['2', '9'], ['4', {ans:5}], ['7', '4']] },
+      { l: 'd)', theme: 'green',  op: '+', sum: 83, rows: [['4', {ans:7}], ['3', '6'], ['8', '3']] },
+      { l: 'e)', theme: 'purple', op: '+', sum: 72, rows: [['4', {ans:8}], ['2', {ans:4}], ['7', '2']] },
+      { l: 'g)', theme: 'orange', op: '+', sum: 74, rows: [['5', '6'], ['1', {ans:8}], ['7', '4']] }
+    ],
+    ex3: [
+      { l: 'a)', theme: 'blue',   op: '+', sum: 84, rows: [['4', '9'], [{ans:3}, '5'], ['8', '4']] },
+      { l: 'b)', theme: 'pink',   op: '+', sum: 65, rows: [[{ans:3}, '8'], ['2', '7'], ['6', '5']] },
+      { l: 'c)', theme: 'green',  op: '+', sum: 73, rows: [[{ans:4}, '8'], [{ans:2}, '5'], ['7', '3']] },
+      { l: 'd)', theme: 'yellow', op: '+', sum: 73, rows: [['2', '7'], [{ans:4}, '6'], ['7', '3']] },
+      { l: 'e)', theme: 'orange', op: '+', sum: 75, rows: [[{ans:5}, '6'], ['1', '9'], ['7', '5']] },
+      { l: 'g)', theme: 'purple', op: '+', sum: 83, rows: [[{ans:5}, '7'], [{ans:2}, '6'], ['8', '3']] }
+    ],
+    ex4: [
+      { l: 'a)', theme: 'yellow', op: '+', sum: 62, rows: [['3', {ans:8}], [{ans:2}, '4'], ['6', '2']] },
+      { l: 'b)', theme: 'pink',   op: '+', sum: 62, rows: [[{ans:3}, {ans:7}], ['2', '5'], ['6', '2']] },
+      { l: 'c)', theme: 'green',  op: '+', sum: 73, rows: [[{ans:4}, '6'], ['2', {ans:7}], ['7', '3']] },
+      { l: 'd)', theme: 'blue',   op: '+', sum: 74, rows: [['4', '8'], [{ans:2}, {ans:6}], ['7', '4']] },
+      { l: 'e)', theme: 'purple', op: '+', sum: 75, rows: [['5', {ans:7}], [{ans:1}, '8'], ['7', '5']] },
+      { l: 'g)', theme: 'orange', op: '+', sum: 65, rows: [[{ans:2}, '9'], ['3', {ans:6}], ['6', '5']] }
+    ]
+  }
+};
+
+// 2. QUẢN LÝ HỒ SƠ & LOCAL STORAGE
+const STORAGE_KEY = 'kidlearn_user_gas_v2';
+let currentUser = {
+  name: '', class: '', stars: 0,
+  progress: { 'toan_b20': { lv1: false, lv2: false, lv3: false } },
+  drafts: { lv1: {}, lv2: {}, lv3: {} },
+  rewardedItems: {},
+  analytics: {
+    activeStudySeconds: 0, attemptHistory: {},
+    errorCounts: { FORGOT_CARRY: 0, REVERSED_DIGITS: 0, LEFT_TO_RIGHT_ORDER: 0, WRONG_ONES: 0, WRONG_TENS: 0 }
+  }
+};
+let saveDebounceTimer = null;
+let lastFocusedInput = null;
+let isSheetSynced = false;
+
+function ensureAnalyticsStructure() {
+  if (!currentUser.analytics) {
+    currentUser.analytics = {
+      activeStudySeconds: 0, attemptHistory: {},
+      errorCounts: { FORGOT_CARRY: 0, REVERSED_DIGITS: 0, LEFT_TO_RIGHT_ORDER: 0, WRONG_ONES: 0, WRONG_TENS: 0 }
+    };
+  }
+  if (!currentUser.analytics.attemptHistory) currentUser.analytics.attemptHistory = {};
+  if (!currentUser.analytics.errorCounts) {
+    currentUser.analytics.errorCounts = { FORGOT_CARRY: 0, REVERSED_DIGITS: 0, LEFT_TO_RIGHT_ORDER: 0, WRONG_ONES: 0, WRONG_TENS: 0 };
+  }
+}
+
+function saveDataImmediate() {
+  if (saveDebounceTimer) { clearTimeout(saveDebounceTimer); saveDebounceTimer = null; }
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(currentUser)); } catch (e) {}
+}
+
+function saveDataDebounced() {
+  if (saveDebounceTimer) clearTimeout(saveDebounceTimer);
+  saveDebounceTimer = setTimeout(() => {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(currentUser)); } catch (e) {}
+    saveDebounceTimer = null;
+  }, 300);
+}
+
+// 3. ĐỒNG BỘ DỮ LIỆU TỪ GOOGLE SHEETS VÀ RENDER GIAO DIỆN TỨC THÌ
+function mergeSheetsData(response) {
+  if (!response) return;
+
+  // Hỗ trợ cả cấu trúc trả về mới (rowsPhepTinh, rowsLoiVan) và cấu trúc cũ (data.lv1.ex1)
+  if (response.data && response.data.lv1) {
+    if (Array.isArray(response.data.lv1.ex1) && response.data.lv1.ex1.length > 0) {
+      window.LESSON_DATA.lv1.ex1 = response.data.lv1.ex1;
+    }
+    if (response.data.lv3 && Array.isArray(response.data.lv3.ex1) && response.data.lv3.ex1.length > 0) {
+      window.LESSON_DATA.lv3.ex1 = response.data.lv3.ex1;
+    }
+  }
+
+  if (Array.isArray(response.rowsPhepTinh) && response.rowsPhepTinh.length > 0) {
+    const lv1Ex1 = [], lv3Ex1 = [];
+    const labels6 = ['a)', 'b)', 'c)', 'd)', 'e)', 'g)'];
+    const labels10 = ['a)', 'b)', 'c)', 'd)', 'e)', 'f)', 'g)', 'h)', 'i)', 'k)'];
+
+    response.rowsPhepTinh.forEach(row => {
+      const level = String(row[0] || '').trim();
+      const bai = String(row[1] || '').trim();
+      const n1 = parseInt(row[3], 10);
+      const n2 = parseInt(row[4], 10);
+      const op = String(row[5] || '+').trim();
+      const ans = parseInt(row[6], 10);
+
+      if (level === 'LV1' && bai === 'Bài 1' && !isNaN(n1) && !isNaN(n2)) {
+        const idx = lv1Ex1.length;
+        lv1Ex1.push({ l: labels6[idx] || (idx + 1) + ')', n1, n2, op, ans: isNaN(ans) ? (n1 + n2) : ans, theme: THEME_KEYS[idx % 6] });
+      } else if (level === 'LV3' && bai === 'Bài 1' && !isNaN(n1) && !isNaN(n2)) {
+        const idx = lv3Ex1.length;
+        lv3Ex1.push({ l: labels10[idx] || (idx + 1) + ')', n1, n2, op, ans: isNaN(ans) ? (n1 + n2) : ans, theme: THEME_KEYS[idx % 6] });
+      }
+    });
+
+    if (lv1Ex1.length > 0) window.LESSON_DATA.lv1.ex1 = lv1Ex1;
+    if (lv3Ex1.length > 0) window.LESSON_DATA.lv3.ex1 = lv3Ex1;
+  }
+
+  if (Array.isArray(response.rowsLoiVan) && response.rowsLoiVan.length > 0) {
+    let lv1Idx = 0, lv2Idx = 0;
+    response.rowsLoiVan.forEach(row => {
+      const level = String(row[0] || '').trim();
+      const moTa = String(row[2] || '').trim();
+      const tomTat = String(row[3] || '').trim();
+      const loiGiai = String(row[4] || '').trim();
+      const n1 = parseInt(row[5], 10);
+      const op = String(row[6] || '+').trim();
+      const n2 = parseInt(row[7], 10);
+      const ans = parseInt(row[8], 10);
+      const donVi = String(row[9] || '').trim();
+
+      if (level === 'LV1' && window.LESSON_DATA.lv1.ex3[lv1Idx] && !isNaN(n1) && !isNaN(n2)) {
+        const target = window.LESSON_DATA.lv1.ex3[lv1Idx];
+        if (moTa) target.desc = moTa;
+        if (tomTat) target.tomTat = tomTat;
+        if (loiGiai) target.solveTxt = loiGiai;
+        target.n1 = n1; target.op = op; target.n2 = n2;
+        target.ansNum = isNaN(ans) ? (n1 + n2) : ans;
+        if (donVi) { target.unit1 = `(${donVi})`; target.unit2 = donVi; }
+        lv1Idx++;
+      } else if (level === 'LV2' && window.LESSON_DATA.lv2.problems[lv2Idx] && !isNaN(n1) && !isNaN(n2)) {
+        const target = window.LESSON_DATA.lv2.problems[lv2Idx];
+        if (moTa) target.desc = moTa;
+        if (tomTat) target.tomTat = tomTat;
+        if (loiGiai) target.solveTxt = loiGiai;
+        target.n1 = n1; target.op = op; target.n2 = n2;
+        target.ansNum = isNaN(ans) ? (n1 + n2) : ans;
+        if (donVi) { target.unit1 = `(${donVi})`; target.unit2 = donVi; }
+        lv2Idx++;
+      }
+    });
+  }
+}
+
+function renderCurrentLevelDOM(level) {
+  const container = document.getElementById('lesson-dynamic-container');
+  if (!container) return;
+
+  let htmlContent = '';
+  if (level === 1 && typeof getHTML_LV1 === 'function') htmlContent = getHTML_LV1();
+  else if (level === 2 && typeof getHTML_LV2 === 'function') htmlContent = getHTML_LV2();
+  else if (level === 3 && typeof getHTML_LV3 === 'function') htmlContent = getHTML_LV3();
+
+  if (htmlContent) {
+    container.innerHTML = htmlContent;
+    const inputName = document.getElementById(`header-name-lv${level}`);
+    const inputClass = document.getElementById(`header-class-lv${level}`);
+    if (inputName) inputName.value = currentUser.name || '';
+    if (inputClass) inputClass.value = currentUser.class || '';
+    bindAndRestoreLevelState(level);
+  }
+}
+
+function loadLessonDataFromGAS(level) {
+  // 1. Vẽ ngay lập tức giao diện để bé không phải chờ
+  renderCurrentLevelDOM(level);
+
+  // 2. Nếu chưa đồng bộ từ Google Sheets trong phiên này thì gọi ngầm lên Code.gs
+  if (!isSheetSynced && typeof google !== 'undefined' && google.script && google.script.run) {
+    google.script.run
+      .withSuccessHandler(function(response) {
+        isSheetSynced = true;
+        if (response && (response.status === 'success' || response.data)) {
+          mergeSheetsData(response);
+          renderCurrentLevelDOM(currentLevel);
+        }
+      })
+      .withFailureHandler(function(err) {
+        console.warn("Sử dụng dữ liệu tích hợp:", err);
+      })
+      .getLessonData();
+  }
+}
+
+// 4. KHỞI CHẠY, LƯU NHÁP & ĐIỀU HƯỚNG Ô NHẬP
+function initApp() {
+  const savedData = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('kidlearn_user_gas_v1');
+  if (savedData) {
+    try {
+      const parsed = JSON.parse(savedData);
+      currentUser = Object.assign(currentUser, parsed);
+      currentUser.drafts = Object.assign({ lv1: {}, lv2: {}, lv3: {} }, parsed.drafts || {});
+      currentUser.rewardedItems = parsed.rewardedItems || {};
+    } catch (e) {}
+  }
+  ensureAnalyticsStructure();
+  updateDashboardUI();
+
+  if (!currentUser.name) {
+    openLoginModal();
+  }
+
+  const container = document.getElementById('lesson-dynamic-container');
+  if (container) {
+    container.addEventListener('input', handleContainerInput);
+    container.addEventListener('keydown', handleContainerKeydown);
+    container.addEventListener('focusin', handleContainerFocusIn);
+    container.addEventListener('focusout', handleContainerFocusOut);
+  }
+
+  window.addEventListener('beforeunload', saveDataImmediate);
+}
+
+function openLoginModal() {
+  document.getElementById('input-name').value = currentUser.name || '';
+  document.getElementById('input-class').value = currentUser.class || '';
+  document.getElementById('modal-login').classList.remove('hidden');
+}
+
+function saveUserProfile() {
+  const name = document.getElementById('input-name').value.trim();
+  const cls = document.getElementById('input-class').value.trim();
+  if (!name) return alert('Bé nhớ nhập tên nhé!');
+  currentUser.name = name;
+  currentUser.class = cls;
+  saveDataImmediate();
+  document.getElementById('modal-login').classList.add('hidden');
+  updateDashboardUI();
+  const inputName = document.getElementById(`header-name-lv${currentLevel}`);
+  const inputClass = document.getElementById(`header-class-lv${currentLevel}`);
+  if (inputName) inputName.value = currentUser.name;
+  if (inputClass) inputClass.value = currentUser.class;
+  playCuteSound('correct');
+}
+
+function syncHeaderProfileInput(lvNum) {
+  const inputName = document.getElementById(`header-name-lv${lvNum}`);
+  const inputClass = document.getElementById(`header-class-lv${lvNum}`);
+  if (inputName) currentUser.name = inputName.value.trim();
+  if (inputClass) currentUser.class = inputClass.value.trim();
+  saveDataDebounced();
+  document.getElementById('header-user-name').innerText = currentUser.name ? currentUser.name : 'Hồ sơ';
+  document.getElementById('dash-greeting-name').innerText = currentUser.name ? currentUser.name : 'Bé';
+}
+
+function toggleParentModal() {
+  updateDashboardUI();
+  const modal = document.getElementById('parent-modal');
+  if (modal) modal.classList.toggle('hidden');
+}
+
+function updateDashboardUI() {
+  ensureAnalyticsStructure();
+  const setTxt = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
+
+  setTxt('global-star-count', currentUser.stars);
+  setTxt('header-user-name', currentUser.name ? currentUser.name : 'Hồ sơ');
+  setTxt('dash-greeting-name', currentUser.name ? currentUser.name : 'Bé');
+
+  const prog = currentUser.progress['toan_b20'] || { lv1: false, lv2: false, lv3: false };
+  let doneCount = 0;
+  ['lv1', 'lv2', 'lv3'].forEach((lv) => {
+    const badge = document.getElementById(`badge-${lv}`);
+    const icon = document.getElementById(`icon-${lv}`);
+    if (prog[lv]) doneCount++;
+    if (badge) {
+      if (prog[lv]) {
+        badge.className = "bg-emerald-50 border-2 border-emerald-400 text-emerald-700 rounded-xl py-2.5 text-center font-baloo font-extrabold text-xs sm:text-sm transition cursor-pointer";
+        if (icon) icon.classList.remove('hidden');
+      } else {
+        badge.className = "bg-slate-100 border-2 border-slate-200 text-slate-500 rounded-xl py-2.5 text-center font-baloo font-extrabold text-xs sm:text-sm transition cursor-pointer hover:border-sky-400";
+        if (icon) icon.classList.add('hidden');
+      }
+    }
+  });
+
+  setTxt('parent-student-name', currentUser.name ? `${currentUser.name} (${currentUser.class || 'Lớp 2'})` : 'Chưa nhập tên');
+  setTxt('parent-star-total', `${currentUser.stars} ⭐`);
+  setTxt('parent-progress-text', `Hoàn tất ${doneCount}/3 cấp độ`);
+}
+
+function bindAndRestoreLevelState(level) {
+  const lvKey = 'lv' + level;
+  const savedDrafts = (currentUser.drafts && currentUser.drafts[lvKey]) ? currentUser.drafts[lvKey] : {};
+
+  document.querySelectorAll('#lesson-dynamic-container [data-prob-id]').forEach(probEl => {
+    const probId = probEl.dataset.probId;
+    const roleCounters = {};
+    probEl.querySelectorAll('.lvl-input, .carry-input').forEach(inp => {
+      let roleTag = inp.dataset.role || inp.dataset.col || inp.dataset.type || 'inp';
+      if (inp.dataset.type === 'digit' && inp.dataset.row !== undefined && inp.dataset.col !== undefined) {
+        roleTag = `r${inp.dataset.row}c${inp.dataset.col}`;
+      }
+      roleCounters[roleTag] = (roleCounters[roleTag] || 0);
+      const semanticKey = `${probId}_${roleTag}_${roleCounters[roleTag]}`;
+      roleCounters[roleTag]++;
+      inp.dataset.draftKey = semanticKey;
+      if (savedDrafts[semanticKey] !== undefined) {
+        inp.value = savedDrafts[semanticKey];
+      }
+    });
+
+    if (currentUser.rewardedItems && currentUser.rewardedItems[probId]) {
+      const badge = probEl.querySelector('.prob-star-badge');
+      if (badge) badge.classList.remove('hidden');
+    }
+  });
+
+  if (typeof applyTouchInputModeToAllInputs === 'function') applyTouchInputModeToAllInputs();
+}
+
+function focusVerticalCardStart(cardEl, event) {
+  if (event && event.target && event.target.tagName === 'INPUT') {
+    const clickedInput = event.target;
+    if (clickedInput.dataset.col === 'tens') {
+      const onesInp = cardEl.querySelector('input[data-col="ones"]');
+      if (onesInp && onesInp.value.trim() === '' && clickedInput.value.trim() === '') {
+        event.preventDefault();
+        onesInp.focus();
+      }
+    }
+    return;
+  }
+  const onesInp = cardEl.querySelector('input[data-col="ones"]');
+  const carryInp = cardEl.querySelector('input[data-role="carry"]');
+  const tensInp = cardEl.querySelector('input[data-col="tens"]');
+  if (onesInp && onesInp.value.trim() === '') onesInp.focus();
+  else if (carryInp && carryInp.value.trim() === '' && tensInp && tensInp.value.trim() === '') carryInp.focus();
+  else if (tensInp) tensInp.focus();
+}
+
+function focusPuzzleCardStart(cardEl, event) {
+  if (event && event.target && event.target.tagName === 'INPUT') return;
+  const inputs = Array.from(cardEl.querySelectorAll('.lvl-input[data-type="digit"]'));
+  if (inputs.length === 0) return;
+  const emptyOnes = inputs.find(i => i.dataset.col === '1' && i.value.trim() === '');
+  if (emptyOnes) { emptyOnes.focus(); return; }
+  const firstEmpty = inputs.find(i => i.value.trim() === '');
+  if (firstEmpty) { firstEmpty.focus(); return; }
+  inputs[0].focus();
+}
+
+let isBase10Regrouped = false;
+function resetBase10RegroupState() { isBase10Regrouped = false; }
+
+function toggleBase10Regroup(forceState) {
+  isBase10Regrouped = (forceState !== undefined) ? forceState : !isBase10Regrouped;
+  const carryDemoEl = document.getElementById('demo-carry-box');
+  const newTenRodEl = document.getElementById('cra-new-ten-rod');
+  const groupOnesBoxEl = document.getElementById('cra-grouped-ones-box');
+  const statusTextEl = document.getElementById('cra-status-text');
+  const btnRegroupEl = document.getElementById('btn-cra-regroup');
+  if (!carryDemoEl) return;
+
+  if (isBase10Regrouped) {
+    carryDemoEl.innerText = '1';
+    carryDemoEl.className = 'w-[28px] h-[28px] flex items-center justify-center font-math font-extrabold text-sm text-white bg-rose-500 border-2 border-rose-600 rounded-md shadow animate-bounce';
+    if (newTenRodEl) { newTenRodEl.classList.remove('hidden'); newTenRodEl.classList.add('flex', 'animate-bounce'); }
+    if (groupOnesBoxEl) groupOnesBoxEl.classList.add('opacity-30', 'scale-90');
+    if (statusTextEl) statusTextEl.innerHTML = `✅ Đã gộp <b>6 + 4 = 10 đơn vị</b> thành <b class="text-rose-600">+1 thanh chục nhớ</b> chuyển sang cột Chục! Còn lại <b>3 đơn vị</b>. Tổng = <b class="text-rose-600">53</b>.`;
+    if (btnRegroupEl) btnRegroupEl.innerHTML = `<span>🔄</span> Xem lại trước khi gộp`;
+    playCuteSound('correct');
+    speakVietnamese('6 đơn vị gộp với 4 đơn vị bằng 10 đơn vị, tạo thành 1 thanh chục mới chuyển sang cột chục. Còn lại 3 đơn vị. Kết quả bằng 53.');
+  } else {
+    carryDemoEl.innerText = '';
+    carryDemoEl.className = 'w-[28px] h-[28px] flex items-center justify-center font-math font-bold text-sm text-rose-600 bg-amber-50 border border-dashed border-amber-400 rounded-md';
+    if (newTenRodEl) { newTenRodEl.classList.add('hidden'); newTenRodEl.classList.remove('flex', 'animate-bounce'); }
+    if (groupOnesBoxEl) groupOnesBoxEl.classList.remove('opacity-30', 'scale-90');
+    if (statusTextEl) statusTextEl.innerHTML = `💡 Cột Đơn vị có <b>6 + 7 = 13 khối lẻ</b> (vượt quá 10). Bé hãy bấm nút để gộp <b>10 khối lẻ</b> thành <b>1 thanh chục</b> nhé!`;
+    if (btnRegroupEl) btnRegroupEl.innerHTML = `<span>✨</span> Gộp 10 đơn vị thành 1 chục`;
+  }
+}
+
+function keypadPress(key) {
+  playKeyClickSound();
+  if (!lastFocusedInput || !document.body.contains(lastFocusedInput)) {
+    const firstEmpty = Array.from(document.querySelectorAll('#lesson-dynamic-container .lvl-input, #lesson-dynamic-container .carry-input')).find(i => i.value.trim() === '');
+    if (firstEmpty) firstEmpty.focus();
+    else return;
+  }
+  const inp = lastFocusedInput;
+  inp.focus();
+
+  if (key === 'BACKSPACE') {
+    if (inp.value.length > 0) {
+      inp.value = inp.value.slice(0, -1);
+      inp.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    return;
+  }
+  if (key === 'NEXT') {
+    const allInputs = Array.from(document.querySelectorAll('#lesson-dynamic-container .lvl-input, #lesson-dynamic-container .carry-input'));
+    const idx = allInputs.indexOf(inp);
+    if (idx >= 0 && idx + 1 < allInputs.length) allInputs[idx + 1].focus();
+    return;
+  }
+
+  const maxLen = parseInt(inp.getAttribute('maxlength') || '2', 10);
+  if (inp.dataset.type === 'wp-op') {
+    if (key === '+' || key === '-') {
+      inp.value = key;
+      inp.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    return;
+  }
+  if (/^[0-9]$/.test(key)) {
+    inp.value = (inp.value.length >= maxLen) ? key : (inp.value + key);
+    inp.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+}
+
+function handleContainerInput(e) {
+  const target = e.target;
+  if (!target || (!target.classList.contains('lvl-input') && !target.classList.contains('carry-input'))) return;
+  const tType = target.dataset.type;
+
+  if (tType === 'vert-digit' || tType === 'digit' || target.dataset.role === 'carry') {
+    target.value = target.value.replace(/[^0-9]/g, '').slice(-1);
+  } else if (tType === 'wp-op') {
+    target.value = target.value.replace(/＋/g, '+').replace(/–|—|−/g, '-').replace(/[^+\-]/g, '').slice(-1);
+  } else {
+    target.value = target.value.replace(/[^0-9]/g, '');
+  }
+
+  const draftKey = target.dataset.draftKey;
+  if (draftKey) {
+    const lvKey = 'lv' + currentLevel;
+    if (!currentUser.drafts[lvKey]) currentUser.drafts[lvKey] = {};
+    currentUser.drafts[lvKey][draftKey] = target.value;
+    saveDataDebounced();
+  }
+
+  // Tự động nhảy con trỏ Phải -> Trái trên thẻ Đặt Tính Dọc
+  const vCard = target.closest('.std-vertical-card');
+  if (vCard && /^[0-9]$/.test(target.value)) {
+    if (target.dataset.col === 'ones') {
+      const carryInp = vCard.querySelector('input[data-role="carry"]');
+      if (carryInp) carryInp.focus();
+    } else if (target.dataset.role === 'carry') {
+      const tensInp = vCard.querySelector('input[data-col="tens"]');
+      if (tensInp) tensInp.focus();
+    }
+    return;
+  }
+
+  // Tự động nhảy qua 2 ô trong thẻ Giải mã (.puzzle-card)
+  const puzCard = target.closest('.puzzle-card');
+  if (puzCard && /^[0-9]$/.test(target.value)) {
+    const cardInputs = Array.from(puzCard.querySelectorAll('.lvl-input[data-type="digit"]'));
+    if (cardInputs.length === 2) {
+      const otherInp = cardInputs.find(i => i !== target && i.value.trim() === '');
+      if (otherInp) otherInp.focus();
+    }
+    return;
+  }
+
+  // Tự động nhảy qua 4 ô bài toán lời văn
+  const wpCard = target.closest('.word-problem-card');
+  if (wpCard) {
+    if (tType === 'wp-n1' && target.value.length === 2) {
+      const opInp = wpCard.querySelector('input[data-type="wp-op"]');
+      if (opInp) opInp.focus();
+    } else if (tType === 'wp-op' && (target.value === '+' || target.value === '-')) {
+      const n2Inp = wpCard.querySelector('input[data-type="wp-n2"]');
+      if (n2Inp) n2Inp.focus();
+    } else if (tType === 'wp-n2' && target.value.length === 2) {
+      const sumInp = wpCard.querySelector('input[data-type="wp-sum"]');
+      if (sumInp) sumInp.focus();
+    } else if (tType === 'wp-sum' && target.value.length === 2) {
+      const ansInp = wpCard.querySelector('input[data-type="ans"]');
+      if (ansInp) ansInp.focus();
+    }
+  }
+}
+
+function handleContainerKeydown(e) {
+  const target = e.target;
+  if (!target) return;
+  const card = target.closest('.std-vertical-card');
+  if (card && e.key === 'Backspace' && target.value === '') {
+    if (target.dataset.col === 'tens') {
+      const carryInp = card.querySelector('input[data-role="carry"]');
+      if (carryInp) { e.preventDefault(); carryInp.focus(); }
+    } else if (target.dataset.role === 'carry') {
+      const onesInp = card.querySelector('input[data-col="ones"]');
+      if (onesInp) { e.preventDefault(); onesInp.focus(); }
+    }
+  }
+}
+
+function handleContainerFocusIn(e) {
+  const target = e.target;
+  if (!target || target.tagName !== 'INPUT') return;
+  if (target.id && target.id.startsWith('header-')) return;
+  lastFocusedInput = target;
+  target.classList.add('rtl-step-active');
+  if (typeof isKeypadVisible !== 'undefined' && isKeypadVisible) {
+    document.getElementById('custom-math-keypad').classList.remove('hidden');
+  }
+}
+
+function handleContainerFocusOut(e) {
+  const target = e.target;
+  if (!target || target.tagName !== 'INPUT') return;
+  target.classList.remove('rtl-step-active');
+}
+
+// 5. HỆ THỐNG CHẤM ĐIỂM ĐA CHIỀU (3 MÀU) & THƯỞNG SAO
+function applyFeedbackStyle(input, status) {
+  const inputType = input.dataset.type;
+  const isCarry = input.dataset.role === 'carry';
+
+  input.classList.remove(
+    'text-blue-800', 'text-blue-900', 'text-rose-600', 'bg-white', 'bg-white/90', 'bg-transparent',
+    'border-sky-400', 'border-dashed', 'border-solid',
+    'text-rose-700', 'bg-rose-100', 'border-rose-500', 'animate-bounce',
+    'text-emerald-700', 'bg-emerald-100', 'border-emerald-500',
+    'text-amber-800', 'bg-amber-50/90', 'bg-amber-100', 'border-amber-400', 'border-amber-500'
+  );
+
+  if (status === 'correct') {
+    input.classList.add('bg-emerald-100', 'text-emerald-700');
+    input.dataset.lastStatus = 'correct';
+    if (input.classList.contains('oly-blank')) input.style.borderBottomColor = '#10b981';
+    else if (isCarry || inputType === 'digit' || inputType === 'vert-digit') input.classList.add('border-emerald-500', 'border-solid');
+  } else if (status === 'empty') {
+    input.classList.add('bg-amber-100', 'text-amber-800');
+    input.dataset.lastStatus = 'empty';
+    if (input.classList.contains('oly-blank')) input.style.borderBottomColor = '#f59e0b';
+    else if (isCarry || inputType === 'digit' || inputType === 'vert-digit') input.classList.add('border-amber-500', 'border-dashed');
+    else input.classList.add('border-amber-400');
+  } else {
+    input.classList.add('bg-rose-100', 'text-rose-700');
+    input.dataset.lastStatus = 'wrong';
+    if (input.classList.contains('oly-blank')) input.style.borderBottomColor = '#f43f5e';
+    else if (isCarry || inputType === 'digit' || inputType === 'vert-digit') input.classList.add('border-rose-500', 'border-solid');
+  }
+}
+
+function evaluateScope(scopeElement) {
+  const allLvlInputs = scopeElement.querySelectorAll('.lvl-input');
+  const allCarryInputs = scopeElement.querySelectorAll('.carry-input');
+  let correctCount = 0, emptyCount = 0, wrongCount = 0;
+  const total = allLvlInputs.length + allCarryInputs.length;
+
+  // 1. Chấm các ô số cơ bản
+  allLvlInputs.forEach(input => {
+    const inputType = input.dataset.type;
+    if (inputType === 'digit' || inputType.startsWith('wp-')) return;
+    const expected = input.dataset.ans;
+    const rawVal = input.value.trim();
+    if (rawVal === '') { emptyCount++; applyFeedbackStyle(input, 'empty'); return; }
+    const isCorrect = (inputType === 'vert-digit')
+      ? (rawVal === expected)
+      : (parseInt(rawVal.replace(/[^0-9]/g, ''), 10) === parseInt(expected.replace(/[^0-9]/g, ''), 10));
+    if (isCorrect) { correctCount++; applyFeedbackStyle(input, 'correct'); }
+    else { wrongCount++; applyFeedbackStyle(input, 'wrong'); }
+  });
+
+  // 1b. Chấm Ô Nhớ (.carry-input)
+  scopeElement.querySelectorAll('.std-vertical-card').forEach(card => {
+    const carryInp = card.querySelector('input[data-role="carry"]');
+    if (!carryInp) return;
+    const cVal = carryInp.value.trim();
+    const expectedCarry = carryInp.dataset.expected || '1';
+    if (cVal === expectedCarry) { correctCount++; applyFeedbackStyle(carryInp, 'correct'); }
+    else if (cVal === '') { emptyCount++; applyFeedbackStyle(carryInp, 'empty'); }
+    else { wrongCount++; applyFeedbackStyle(carryInp, 'wrong'); }
+  });
+
+  // 2. Chấm 4 ô lời văn (.word-problem-card) kèm kiểm tra đẳng thức liên kết
+  scopeElement.querySelectorAll('.word-problem-card').forEach(wpCard => {
+    const expN1 = parseInt(wpCard.dataset.n1, 10);
+    const expN2 = parseInt(wpCard.dataset.n2, 10);
+    const expOp = wpCard.dataset.op;
+    const expSum = parseInt(wpCard.dataset.sum, 10);
+
+    const inpN1 = wpCard.querySelector('input[data-type="wp-n1"]');
+    const inpOp = wpCard.querySelector('input[data-type="wp-op"]');
+    const inpN2 = wpCard.querySelector('input[data-type="wp-n2"]');
+    const inpSum = wpCard.querySelector('input[data-type="wp-sum"]');
+
+    const v1Raw = inpN1 ? inpN1.value.trim() : '';
+    const vOpRaw = inpOp ? inpOp.value.trim() : '';
+    const v2Raw = inpN2 ? inpN2.value.trim() : '';
+    const vSumRaw = inpSum ? inpSum.value.trim() : '';
+
+    const v1 = v1Raw !== '' ? parseInt(v1Raw, 10) : null;
+    const v2 = v2Raw !== '' ? parseInt(v2Raw, 10) : null;
+    let operandsPairValid = false;
+
+    if (v1 !== null && v2 !== null) {
+      if ((v1 === expN1 && v2 === expN2) || (v1 === expN2 && v2 === expN1)) {
+        operandsPairValid = true;
+        correctCount += 2;
+        applyFeedbackStyle(inpN1, 'correct');
+        applyFeedbackStyle(inpN2, 'correct');
+      } else {
+        if (v1 === expN1 || v1 === expN2) { correctCount++; applyFeedbackStyle(inpN1, 'correct'); wrongCount++; applyFeedbackStyle(inpN2, 'wrong'); }
+        else {
+          wrongCount++; applyFeedbackStyle(inpN1, 'wrong');
+          if (v2 === expN1 || v2 === expN2) { correctCount++; applyFeedbackStyle(inpN2, 'correct'); }
+          else { wrongCount++; applyFeedbackStyle(inpN2, 'wrong'); }
+        }
+      }
+    } else {
+      if (inpN1) {
+        if (v1 === null) { emptyCount++; applyFeedbackStyle(inpN1, 'empty'); }
+        else if (v1 === expN1 || v1 === expN2) { correctCount++; applyFeedbackStyle(inpN1, 'correct'); }
+        else { wrongCount++; applyFeedbackStyle(inpN1, 'wrong'); }
+      }
+      if (inpN2) {
+        if (v2 === null) { emptyCount++; applyFeedbackStyle(inpN2, 'empty'); }
+        else if (v2 === expN1 || v2 === expN2) { correctCount++; applyFeedbackStyle(inpN2, 'correct'); }
+        else { wrongCount++; applyFeedbackStyle(inpN2, 'wrong'); }
+      }
+    }
+
+    let opValid = false;
+    if (inpOp) {
+      if (vOpRaw === '') { emptyCount++; applyFeedbackStyle(inpOp, 'empty'); }
+      else if (vOpRaw === expOp) { opValid = true; correctCount++; applyFeedbackStyle(inpOp, 'correct'); }
+      else { wrongCount++; applyFeedbackStyle(inpOp, 'wrong'); }
+    }
+
+    if (inpSum) {
+      if (vSumRaw === '') { emptyCount++; applyFeedbackStyle(inpSum, 'empty'); }
+      else {
+        const vSum = parseInt(vSumRaw, 10);
+        const hasFullLeft = (v1 !== null && v2 !== null && vOpRaw !== '');
+        const eqConsistent = !hasFullLeft || (opValid && operandsPairValid && (v1 + v2 === vSum));
+        if (vSum === expSum && eqConsistent) { correctCount++; applyFeedbackStyle(inpSum, 'correct'); }
+        else { wrongCount++; applyFeedbackStyle(inpSum, 'wrong'); }
+      }
+    }
+  });
+
+  // 3. Chấm các thẻ Giải mã chữ số (.puzzle-card) ở LV3
+  scopeElement.querySelectorAll('.puzzle-card').forEach(card => {
+    const cardInputs = Array.from(card.querySelectorAll('.lvl-input[data-type="digit"]'));
+    const targetSum = parseInt(card.dataset.sum, 10);
+    const uSum = targetSum % 10;
+    const tSum = Math.floor(targetSum / 10);
+    const neededOnesSum = 10 + uSum;
+    const neededTensSum = tSum - 1;
+
+    const isSameColTwoInputs = (cardInputs.length === 2 && cardInputs[0].dataset.col === cardInputs[1].dataset.col);
+    if (isSameColTwoInputs) {
+      const col = parseInt(cardInputs[0].dataset.col, 10);
+      const raw0 = cardInputs[0].value.trim();
+      const raw1 = cardInputs[1].value.trim();
+      const has0 = /^[0-9]$/.test(raw0), has1 = /^[0-9]$/.test(raw1);
+      const d0 = has0 ? parseInt(raw0, 10) : null;
+      const d1 = has1 ? parseInt(raw1, 10) : null;
+      const inDom = (d) => d !== null && (col === 1 ? (d >= neededOnesSum - 9 && d <= 9) : (d >= 1 && d <= neededTensSum - 1));
+
+      if (has0 && has1) {
+        const pairValid = (col === 1) ? (d0 + d1 === neededOnesSum) : (d0 >= 1 && d1 >= 1 && d0 + d1 === neededTensSum);
+        if (pairValid) {
+          correctCount += 2;
+          applyFeedbackStyle(cardInputs[0], 'correct');
+          applyFeedbackStyle(cardInputs[1], 'correct');
+        } else {
+          if (inDom(d0)) { correctCount++; applyFeedbackStyle(cardInputs[0], 'correct'); wrongCount++; applyFeedbackStyle(cardInputs[1], 'wrong'); }
+          else if (inDom(d1)) { wrongCount++; applyFeedbackStyle(cardInputs[0], 'wrong'); correctCount++; applyFeedbackStyle(cardInputs[1], 'correct'); }
+          else { wrongCount += 2; applyFeedbackStyle(cardInputs[0], 'wrong'); applyFeedbackStyle(cardInputs[1], 'wrong'); }
+        }
+      } else {
+        cardInputs.forEach(inp => {
+          const r = inp.value.trim();
+          if (r === '') { emptyCount++; applyFeedbackStyle(inp, 'empty'); }
+          else if (inDom(parseInt(r, 10))) { correctCount++; applyFeedbackStyle(inp, 'correct'); }
+          else { wrongCount++; applyFeedbackStyle(inp, 'wrong'); }
+        });
+      }
+    } else {
+      cardInputs.forEach(inp => {
+        const rawVal = inp.value.trim();
+        const col = parseInt(inp.dataset.col, 10);
+        const row = parseInt(inp.dataset.row, 10);
+        const otherRow = row === 0 ? 1 : 0;
+        const fixedStr = card.dataset[`r${otherRow}${col}`];
+        const expectedDigit = (fixedStr !== undefined && fixedStr !== '')
+          ? (col === 1 ? neededOnesSum - parseInt(fixedStr, 10) : neededTensSum - parseInt(fixedStr, 10))
+          : parseInt(inp.dataset.ans, 10);
+
+        if (rawVal === '') { emptyCount++; applyFeedbackStyle(inp, 'empty'); }
+        else if (/^[0-9]$/.test(rawVal) && parseInt(rawVal, 10) === expectedDigit) { correctCount++; applyFeedbackStyle(inp, 'correct'); }
+        else { wrongCount++; applyFeedbackStyle(inp, 'wrong'); }
+      });
+    }
+  });
+
+  // 4. Thưởng +2 Sao cho mỗi câu hoàn thành đúng
+  let newlyRewardedStars = 0;
+  scopeElement.querySelectorAll('[data-prob-id]').forEach(probEl => {
+    const probId = probEl.dataset.probId;
+    const reqInputs = Array.from(probEl.querySelectorAll('.lvl-input, .carry-input'));
+    if (reqInputs.length === 0) return;
+    if (reqInputs.every(inp => inp.dataset.lastStatus === 'correct')) {
+      const badge = probEl.querySelector('.prob-star-badge');
+      if (badge) badge.classList.remove('hidden');
+      if (!currentUser.rewardedItems[probId]) {
+        currentUser.rewardedItems[probId] = true;
+        currentUser.stars += 2;
+        newlyRewardedStars += 2;
+      }
+    }
+  });
+
+  saveDataImmediate();
+  updateDashboardUI();
+  return { correctCount, emptyCount, wrongCount, total, newlyRewardedStars };
+}
+
+function gradeSection(sectionId) {
+  const secEl = document.getElementById(`sec-${sectionId}`);
+  if (!secEl) return;
+  const res = evaluateScope(secEl);
+  const msgEl = document.getElementById(`msg-sec-${sectionId}`);
+  if (!msgEl) return;
+  const starNote = res.newlyRewardedStars > 0 ? ` (+${res.newlyRewardedStars} ⭐ mới!)` : '';
+
+  if (res.correctCount === res.total && res.total > 0) {
+    msgEl.className = "text-sm sm:text-base font-baloo font-extrabold text-emerald-600";
+    msgEl.innerHTML = `🎉 Xuất sắc! Bé làm đúng cả ${res.correctCount}/${res.total} ô trong phần này!${starNote}`;
+    playCuteSound('correct');
+  } else if (res.wrongCount === 0 && res.emptyCount > 0) {
+    msgEl.className = "text-sm sm:text-base font-baloo font-extrabold text-amber-600";
+    msgEl.innerHTML = `💡 Bé đã làm đúng ${res.correctCount} ô, còn ${res.emptyCount} ô màu vàng chưa điền nhé!${starNote}`;
+    playCuteSound('correct');
+  } else {
+    msgEl.className = "text-sm sm:text-base font-baloo font-extrabold text-rose-600";
+    msgEl.innerHTML = `💪 Đúng ${res.correctCount}/${res.total} ô. Bé sửa lại ${res.wrongCount} ô màu đỏ và điền ${res.emptyCount} ô màu vàng nhé!${starNote}`;
+  }
+}
+
+function restoreDefaultInputStyle(input) {
+  const inputType = input.dataset.type;
+  input.classList.remove(
+    'text-emerald-700', 'bg-emerald-100', 'border-emerald-500', 'border-solid',
+    'text-rose-700', 'bg-rose-100', 'border-rose-500', 'animate-bounce',
+    'text-amber-800', 'bg-amber-50/90', 'bg-amber-100', 'border-amber-400', 'border-amber-500'
+  );
+  if (input.dataset.role === 'carry') {
+    input.classList.add('text-rose-600', 'bg-amber-50/90', 'border-amber-400', 'border-dashed');
+  } else if (input.classList.contains('oly-blank')) {
+    input.style.borderBottomColor = 'rgba(2, 132, 199, 0.55)';
+    input.classList.add('bg-transparent', inputType === 'wp-op' ? 'text-rose-600' : 'text-blue-900');
+  } else if (inputType === 'digit' || inputType === 'vert-digit') {
+    input.classList.add('text-blue-800', 'border-sky-400', 'border-dashed', 'bg-white/90');
+  } else {
+    input.classList.add('text-blue-800', 'bg-white');
+  }
+}
+
+function resetSection(sectionId) {
+  const secEl = document.getElementById(`sec-${sectionId}`);
+  if (!secEl) return;
+  const lvKey = 'lv' + currentLevel;
+  secEl.querySelectorAll('.lvl-input, .carry-input').forEach(input => {
+    input.value = '';
+    delete input.dataset.lastStatus;
+    if (input.dataset.draftKey && currentUser.drafts[lvKey]) delete currentUser.drafts[lvKey][input.dataset.draftKey];
+    restoreDefaultInputStyle(input);
+  });
+  saveDataImmediate();
+  const msgEl = document.getElementById(`msg-sec-${sectionId}`);
+  if (msgEl) msgEl.innerHTML = '';
+}
+
+function gradeLevel() {
+  const container = document.getElementById('lesson-dynamic-container');
+  const res = evaluateScope(container);
+  const msg = document.getElementById('msg-grader');
+  const starNote = res.newlyRewardedStars > 0 ? ` (+${res.newlyRewardedStars} ⭐)` : '';
+
+  // Đồng bộ lịch sử điểm lên Google Sheets
+  if (typeof google !== 'undefined' && google.script && google.script.run) {
+    google.script.run.saveStudentProgress({
+      name: currentUser.name,
+      class: currentUser.class,
+      stars: currentUser.stars,
+      activeStudySeconds: currentUser.analytics.activeStudySeconds || 0,
+      firstTryRate: Math.round((res.correctCount / Math.max(1, res.total)) * 100),
+      errorForgotCarry: 0,
+      errorReversed: 0
+    });
+  }
+
+  if (res.correctCount === res.total && res.total > 0) {
+    msg.className = "text-center font-baloo font-extrabold text-xl text-emerald-600 animate-bounce mt-3";
+    msg.innerHTML = `🎉 Tuyệt vời! Bé đã hoàn thành đúng 100% (${res.correctCount}/${res.total} ô)!${starNote}`;
+    triggerConfetti();
+    playCuteSound('level_complete');
+    handleLevelSuccess();
+  } else if (res.wrongCount === 0 && res.emptyCount > 0) {
+    msg.className = "text-center font-baloo font-extrabold text-lg text-amber-600 mt-3";
+    msg.innerHTML = `💡 Bé đã làm đúng ${res.correctCount}/${res.total} ô, còn ${res.emptyCount} ô màu vàng chưa điền nhé!${starNote}`;
+    playCuteSound('correct');
+  } else {
+    msg.className = "text-center font-baloo font-extrabold text-lg text-rose-600 mt-3";
+    msg.innerHTML = `💪 Bé làm đúng ${res.correctCount}/${res.total} ô. Hãy sửa ${res.wrongCount} ô màu đỏ và điền ${res.emptyCount} ô màu vàng nhé!${starNote}`;
+  }
+}
+
+function resetLevel() {
+  const lvKey = 'lv' + currentLevel;
+  currentUser.drafts[lvKey] = {};
+  saveDataImmediate();
+  document.querySelectorAll('#lesson-dynamic-container .lvl-input, #lesson-dynamic-container .carry-input').forEach(input => {
+    input.value = '';
+    delete input.dataset.lastStatus;
+    restoreDefaultInputStyle(input);
+  });
+  document.querySelectorAll('[id^="msg-sec-"]').forEach(el => el.innerHTML = '');
+  const msg = document.getElementById('msg-grader');
+  if (msg) msg.innerHTML = '';
+}
+
+// ============================================================================
+// BỘ SINH ĐỀ TOÁN ĐỘNG (FISHER-YATES SHUFFLE - O(1), 0% TRÙNG LẶP)
+// ============================================================================
+
+let regroupingPool = [];
+
+// Khởi tạo không gian mẫu: Tất cả phép cộng có nhớ trong phạm vi 100
+function initRegroupingPool() {
+  const pool = [];
+  for (let n1 = 11; n1 <= 88; n1++) {
+    for (let n2 = 11; n2 <= 88; n2++) {
+      if (n1 + n2 <= 99) {
+        let u1 = n1 % 10;
+        let u2 = n2 % 10;
+        if (u1 + u2 >= 10) { // Điều kiện cộng qua 10 ở hàng đơn vị
+          pool.push({ n1: n1, n2: n2, sum: n1 + n2 });
+        }
+      }
+    }
+  }
+  
+  // Thuật toán xáo trộn Fisher-Yates (Hoán đổi ngẫu nhiên từ cuối lên đầu)
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  
+  regroupingPool = pool;
+}
+
+// Rút ra 1 cặp số duy nhất bằng phương thức pop() - O(1)
+function getUniqueRegroupingPair() {
+  if (regroupingPool.length === 0) {
+    initRegroupingPool(); // Tự động nạp lại khi cạn kiệt kho đề
+  }
+  return regroupingPool.pop();
+}
+
+function randInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+// Hàm xây dựng cấu trúc thẻ Giải mã chữ số (Puzzle)
+function buildPuzzleItem(label, theme, pair, maskMode) {
+  const t1 = String(Math.floor(pair.n1 / 10));
+  const u1 = String(pair.n1 % 10);
+  const t2 = String(Math.floor(pair.n2 / 10));
+  const u2 = String(pair.n2 % 10);
+  const tS = String(Math.floor(pair.sum / 10));
+  const uS = String(pair.sum % 10);
+
+  let r0 = [t1, u1], r1 = [t2, u2];
+
+  if (maskMode === 'ones_single_r0') r0[1] = { ans: parseInt(u1, 10) };
+  else if (maskMode === 'ones_single_r1') r1[1] = { ans: parseInt(u2, 10) };
+  else if (maskMode === 'ones_both') { r0[1] = { ans: parseInt(u1, 10) }; r1[1] = { ans: parseInt(u2, 10) }; }
+  else if (maskMode === 'tens_single_r0') r0[0] = { ans: parseInt(t1, 10) };
+  else if (maskMode === 'tens_single_r1') r1[0] = { ans: parseInt(t2, 10) };
+  else if (maskMode === 'tens_both') { r0[0] = { ans: parseInt(t1, 10) }; r1[0] = { ans: parseInt(t2, 10) }; }
+  else if (maskMode === 'mixed_diag1') { r0[1] = { ans: parseInt(u1, 10) }; r1[0] = { ans: parseInt(t2, 10) }; }
+  else if (maskMode === 'mixed_diag2') { r0[0] = { ans: parseInt(t1, 10) }; r1[1] = { ans: parseInt(u2, 10) }; }
+  else if (maskMode === 'mixed_row0') { r0[0] = { ans: parseInt(t1, 10) }; r0[1] = { ans: parseInt(u1, 10) }; }
+  else if (maskMode === 'mixed_row1') { r1[0] = { ans: parseInt(t2, 10) }; r1[1] = { ans: parseInt(u2, 10) }; }
+
+  return { l: label, theme: theme, op: '+', sum: pair.sum, rows: [r0, r1, [tS, uS]] };
+}
+
+// Thay số mới vào Bài toán lời văn mà không làm hỏng cú pháp tiếng Việt
+function updateWordProblemItemNumbers(wpItem, newN1, newN2) {
+  const oldN1 = wpItem.n1;
+  const oldN2 = wpItem.n2;
+  const newSum = newN1 + newN2;
+
+  wpItem.desc = wpItem.desc.replace(new RegExp(`\\b${oldN1}\\b`), '___N1___').replace(new RegExp(`\\b${oldN2}\\b`), String(newN2)).replace('___N1___', String(newN1));
+  if (wpItem.ttsText) wpItem.ttsText = wpItem.ttsText.replace(new RegExp(`\\b${oldN1}\\b`), '___N1___').replace(new RegExp(`\\b${oldN2}\\b`), String(newN2)).replace('___N1___', String(newN1));
+  if (wpItem.tomTat) wpItem.tomTat = wpItem.tomTat.replace(new RegExp(`\\b${oldN1}\\b`), '___N1___').replace(new RegExp(`\\b${oldN2}\\b`), String(newN2)).replace('___N1___', String(newN1));
+
+  wpItem.n1 = newN1;
+  wpItem.n2 = newN2;
+  wpItem.ansNum = newSum;
+}
+
+function clearRewardedKeysByPrefix(prefix) {
+  if (!currentUser.rewardedItems) return;
+  Object.keys(currentUser.rewardedItems).forEach(k => {
+    if (k.startsWith(prefix)) {
+      delete currentUser.rewardedItems[k];
+    }
+  });
+}
+
+// Đổ dữ liệu ngẫu nhiên vào dữ liệu bài học
+function randomizeSectionData(sectionId) {
+  const labels6 = ['a)', 'b)', 'c)', 'd)', 'e)', 'g)'];
+  const labels10 = ['a)', 'b)', 'c)', 'd)', 'e)', 'f)', 'g)', 'h)', 'i)', 'k)'];
+
+  if (sectionId === 'lv1_ex1') {
+    clearRewardedKeysByPrefix('lv1_ex1_');
+    window.LESSON_DATA.lv1.ex1 = labels6.map((l, idx) => {
+      const p = getUniqueRegroupingPair();
+      return { l, n1: p.n1, n2: p.n2, op: '+', ans: p.sum, theme: THEME_KEYS[idx % THEME_KEYS.length] };
+    });
+  } else if (sectionId === 'lv1_ex2') {
+    clearRewardedKeysByPrefix('lv1_ex2_');
+    const tA = randInt(2, 5), uA = randInt(4, 8);
+    const nA = tA * 10 + uA;
+    const compA = 10 - uA;
+    const extraA = compA + 10;
+    const extraA2 = extraA + randInt(1, 3);
+    window.LESSON_DATA.lv1.ex2[0].items = [
+      { c1: String(nA), op: '+', c2: String(compA), eq: '=', ans: nA + compA },
+      { c1: String(nA), op: '+', c2: String(extraA), eq: '=', ans: nA + extraA },
+      { c1: String(nA), op: '+', c2: String(extraA2), eq: '=', ans: nA + extraA2 }
+    ];
+    const pSwap = getUniqueRegroupingPair();
+    const pExtra = getUniqueRegroupingPair();
+    window.LESSON_DATA.lv1.ex2[1].items = [
+      { c1: String(pSwap.n1), op: '+', c2: String(pSwap.n2), eq: '=', ans: pSwap.sum },
+      { c1: String(pSwap.n2), op: '+', c2: String(pSwap.n1), eq: '=', ans: pSwap.sum },
+      { c1: String(pExtra.n1), op: '+', c2: String(pExtra.n2), eq: '=', ans: pExtra.sum }
+    ];
+    window.LESSON_DATA.lv1.ex2[2].items = [0, 1, 2].map(() => {
+      const uFirst = randInt(2, 8);
+      const uSecond = 10 - uFirst;
+      const tFirst = randInt(1, 4);
+      const tSecond = randInt(1, 3);
+      const a1 = tFirst * 10 + uFirst;
+      const a2 = tSecond * 10 + uSecond;
+      const a3 = randInt(3, 9);
+      return { c1: `${a1} + ${a2}`, op: '+', c2: String(a3), eq: '=', ans: a1 + a2 + a3 };
+    });
+  } else if (sectionId === 'lv1_ex3') {
+    clearRewardedKeysByPrefix('lv1_ex3_');
+    window.LESSON_DATA.lv1.ex3.forEach(item => {
+      const p = getUniqueRegroupingPair();
+      updateWordProblemItemNumbers(item, p.n1, p.n2);
+    });
+  } else if (sectionId === 'lv2_all') {
+    clearRewardedKeysByPrefix('lv2_prob_');
+    window.LESSON_DATA.lv2.problems.forEach(item => {
+      const p = getUniqueRegroupingPair();
+      updateWordProblemItemNumbers(item, p.n1, p.n2);
+    });
+  } else if (sectionId === 'lv3_ex1') {
+    clearRewardedKeysByPrefix('lv3_ex1_');
+    window.LESSON_DATA.lv3.ex1 = labels10.map((l, idx) => {
+      const p = getUniqueRegroupingPair();
+      return { l, n1: p.n1, n2: p.n2, op: '+', ans: p.sum, theme: THEME_KEYS[idx % THEME_KEYS.length] };
+    });
+  } else if (sectionId === 'lv3_ex2') {
+    clearRewardedKeysByPrefix('lv3_ex2_');
+    const modesEx2 = ['ones_single_r0', 'ones_both', 'ones_single_r1', 'ones_single_r0', 'ones_both', 'ones_single_r1'];
+    window.LESSON_DATA.lv3.ex2 = labels6.map((l, idx) => {
+      const p = getUniqueRegroupingPair();
+      return buildPuzzleItem(l, THEME_KEYS[idx % THEME_KEYS.length], p, modesEx2[idx]);
+    });
+  } else if (sectionId === 'lv3_ex3') {
+    clearRewardedKeysByPrefix('lv3_ex3_');
+    const modesEx3 = ['tens_single_r1', 'tens_single_r0', 'tens_both', 'tens_single_r1', 'tens_single_r0', 'tens_both'];
+    window.LESSON_DATA.lv3.ex3 = labels6.map((l, idx) => {
+      const p = getUniqueRegroupingPair();
+      return buildPuzzleItem(l, THEME_KEYS[(idx + 1) % THEME_KEYS.length], p, modesEx3[idx]);
+    });
+  } else if (sectionId === 'lv3_ex4') {
+    clearRewardedKeysByPrefix('lv3_ex4_');
+    const modesEx4 = ['mixed_diag1', 'mixed_row0', 'mixed_diag2', 'mixed_row1', 'mixed_diag1', 'mixed_diag2'];
+    window.LESSON_DATA.lv3.ex4 = labels6.map((l, idx) => {
+      const p = getUniqueRegroupingPair();
+      return buildPuzzleItem(l, THEME_KEYS[(idx + 2) % THEME_KEYS.length], p, modesEx4[idx]);
+    });
+  }
+}
+
+// Chạy xáo trộn, vẽ lại giao diện bài học mới
+function randomizeSection(sectionId) {
+  randomizeSectionData(sectionId);
+  resetSection(sectionId);
+  renderCurrentLevelDOM(currentLevel); // Vẽ lại HTML với dữ liệu mới
+  
+  const secEl = document.getElementById(`sec-${sectionId}`);
+  if (secEl) secEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  const msgEl = document.getElementById(`msg-sec-${sectionId}`);
+  if (msgEl) {
+    msgEl.className = "text-sm font-baloo font-extrabold text-indigo-600";
+    msgEl.innerHTML = `🎲 Đã tạo bộ đề luyện tập mới cho bài này! Bé bắt đầu thử sức để nhận thêm Sao nhé!`;
+  }
+  playCuteSound('correct');
+}
+
+// Bấm nút Đổi Đề Mới cho toàn bộ phiếu
+function randomizeCurrentLevel() {
+  if (currentLevel === 1) {
+    randomizeSectionData('lv1_ex1');
+    randomizeSectionData('lv1_ex2');
+    randomizeSectionData('lv1_ex3');
+  } else if (currentLevel === 2) {
+    randomizeSectionData('lv2_all');
+  } else if (currentLevel === 3) {
+    randomizeSectionData('lv3_ex1');
+    randomizeSectionData('lv3_ex2');
+    randomizeSectionData('lv3_ex3');
+    randomizeSectionData('lv3_ex4');
+  }
+  
+  resetLevel();
+  renderCurrentLevelDOM(currentLevel); 
+  
+  const msg = document.getElementById('msg-grader');
+  if (msg) {
+    msg.className = "text-center font-baloo font-extrabold text-lg text-indigo-600 mt-3";
+    msg.innerHTML = `🎲 Đã đổi bộ số cộng có nhớ mới cho toàn bộ phiếu LV${currentLevel}! Chúc bé làm bài thật vui!`;
+  }
+  playCuteSound('correct');
+}
+
+function handleLevelSuccess() {
+  const lvKey = 'lv' + currentLevel;
+  if (!currentUser.progress['toan_b20'][lvKey]) {
+    currentUser.stars += 10;
+    currentUser.progress['toan_b20'][lvKey] = true;
+    saveDataImmediate();
+    updateDashboardUI();
+  }
+  const modal = document.getElementById('modal-success');
+  const btnNext = document.getElementById('btn-next-level');
+  if (currentLevel < 3) {
+    btnNext.innerHTML = `<span>🚀</span> CHƠI TIẾP CẤP ĐỘ ${currentLevel + 1}`;
+    btnNext.classList.remove('hidden');
+  } else {
+    btnNext.classList.add('hidden');
+  }
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+}
+
+function closeSuccessModal() {
+  document.getElementById('modal-success').classList.add('hidden');
+  document.getElementById('modal-success').classList.remove('flex');
+}
+
+function goToNextLevel() {
+  closeSuccessModal();
+  switchLevel(currentLevel + 1, true);
+}
+
+// SỰ KIỆN KHỞI CHẠY (Bao gồm nạp kho đề Fisher-Yates ngay khi mở Web)
+window.addEventListener('DOMContentLoaded', () => {
+    initRegroupingPool(); // Khởi tạo và xóc đều 100% kho đề
+    initApp();            // Khởi chạy App
+});
+</script>
