@@ -156,7 +156,7 @@ function validateLessonRecords_(lesson, sections, questions) {
   questions.forEach(function(q) {
     unique(q.question_id,'QUESTION');
     if (!sectionIds[q.section_id]) errors.push('QUESTION '+q.question_id+': INVALID_SECTION');
-    if (!q.question_type || !q.answer || !q.payload_json) errors.push('QUESTION '+q.question_id+': MISSING_REQUIRED');
+    if (!q.question_type || q.answer === '' || q.answer === null || q.answer === undefined || !q.payload_json) errors.push('QUESTION '+q.question_id+': MISSING_REQUIRED');
     try {
       var p=JSON.parse(q.payload_json || '{}');
       if (Array.isArray(p.terms) && p.answer !== undefined) {
