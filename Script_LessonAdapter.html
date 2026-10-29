@@ -52,6 +52,7 @@
     }
     throw Error('LessonAdapter: unsupported type '+q.question_type);
   }
+  let activeQuestionIds = Object.create(null);
   function apply(api, current) {
     assert(api && api.status==='success' && api.lessonId==='MATH_B020','API unavailable or mismatched');
     assert(Array.isArray(api.sections)&&Array.isArray(api.questions),'missing collections');
@@ -64,6 +65,7 @@
       (bySection[q.section_id]||(bySection[q.section_id]=[])).push(q);
     });
     const draft=JSON.parse(JSON.stringify(current));
+    const nextQuestionIds=Object.create(null);
     // Preserve non-JSON inline SVG illustrations (stored as strings in original lesson).
     Object.keys(sectionMap).forEach(id=>{
       const path=sectionMap[id],questions=(bySection[id]||[]).sort((a,b)=>Number(a.sort_order)-Number(b.sort_order));
@@ -71,14 +73,47 @@
       assert(type,'missing section '+id);
       questions.forEach(q=>assert(q.question_type===type,'type mismatch '+q.question_id));
       const existing=path.length===3?draft[path[0]][path[1]][path[2]].items:draft[path[0]][path[1]];
+      nextQuestionIds[id]=questions.map(q=>q.question_id);
       const mapped=questions.map((q,i)=>transform(q,existing[i],i));
       if(path.length===3)draft[path[0]][path[1]][path[2]].items=mapped;
       else draft[path[0]][path[1]]=mapped;
     });
+    activeQuestionIds=nextQuestionIds;
     draft.id='toan_b20'; draft.lessonId=api.lessonId;
     draft.contentVersion=api.schemaVersion; draft.sourceReviewPending=true;
     return draft;
   }
-  window.LessonAdapter={apply,sectionMap,plain,safe};
+  // Attach durable IDs to cards AFTER existing renderer creates its inputs.
+  // Existing grading uses dataset.probId, so this also stabilizes reward keys.
+  function bindStableIds(root, level, user) {
+    if (!root || !activeQuestionIds || !user) return;
+    const mappings=[
+      ['B020_L1_E1','lv1_ex1_',1],['B020_L1_E2A','lv1_ex2_0_',1],
+      ['B020_L1_E2B','lv1_ex2_1_',1],['B020_L1_E2C','lv1_ex2_2_',1],
+      ['B020_L1_E3','lv1_ex3_',1],['B020_L2_E1','lv2_prob_',2],
+      ['B020_L3_E1','lv3_ex1_',3],['B020_L3_E2','lv3_ex2_',3],
+      ['B020_L3_E3','lv3_ex3_',3],['B020_L3_E4','lv3_ex4_',3]
+    ];
+    mappings.forEach(([sid, prefix, lv])=>{
+      if (lv!==Number(level)) return;
+      const ids=activeQuestionIds[sid]||[];
+      ids.forEach((id,idx)=>{
+        const legacyId=prefix+idx;
+        const card=Array.from(root.querySelectorAll('[data-prob-id]'))
+          .find(el=>el.dataset.probId===legacyId);
+        if(!card) return;
+        const legacyDraft=user.drafts && user.drafts['lv'+lv];
+        // Save compatibility: migrate only once, without overwriting newer values.
+        // Draft keys include role and ordinal suffix.
+        if(legacyDraft) Object.keys(legacyDraft).filter(k=>k.startsWith(legacyId+'_'))
+          .forEach(k=>{const newKey=id+k.slice(legacyId.length);
+            if(legacyDraft[newKey]===undefined)legacyDraft[newKey]=legacyDraft[k];});
+        if(user.rewardedItems && user.rewardedItems[legacyId] && !user.rewardedItems[id])
+          user.rewardedItems[id]=true;
+        card.dataset.probId=id;
+      });
+    });
+  }
+  window.LessonAdapter={apply,sectionMap,plain,safe,bindStableIds};
 })();
 </script>
