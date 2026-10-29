@@ -123,8 +123,12 @@ window.LessonGenericRenderer = (function () {
     if(!apiData) return null;
     const sections=apiData.sections.filter(s=>Number(s.level)===Number(level))
       .sort((a,b)=>Number(a.sort_order)-Number(b.sort_order));
+    const pending=apiData.questions.some(q=>q.qa_status!=='SOURCE_VERIFIED');
+    const reviewNote=pending?
+      '<aside class="rounded-xl border-2 border-amber-300 bg-amber-50 text-amber-900 p-3 text-sm font-bold">'+
+      'Nội dung luyện tập đang chờ đối chiếu SGK/SBT. Chưa nghiệm thu nguồn học liệu.</aside>':'';
     return getHeaderHTML(esc(apiData.lesson.title),'LV'+level+' — '+sections.length+' phần học',level)+
-      '<div class="p-4 sm:p-7 space-y-7 bg-[#fffdf9]">'+
+      '<div class="p-4 sm:p-7 space-y-7 bg-[#fffdf9]">'+reviewNote+
       sections.map(sectionHtml).join('')+getFooterButtons().replace('ĐỔI ĐỀ MỚI LUYỆN THÊM','TẠO LƯỢT LUYỆN MỚI')+'</div>';
   }
   function initialize(response){
