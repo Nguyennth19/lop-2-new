@@ -249,25 +249,41 @@ function renderCurrentLevelDOM(level) {
   }
 }
 
+// DEVELOPMENT ONLY: phase 2 structured data integration on non-production branch.
+const PHASE2_SHEETS_ADAPTER = true;
+let phase2Loading = false;
 function loadLessonDataFromGAS(level) {
-  // 1. Vẽ ngay lập tức giao diện để bé không phải chờ
   renderCurrentLevelDOM(level);
-
-  // 2. Nếu chưa đồng bộ từ Google Sheets trong phiên này thì gọi ngầm lên Code.gs
-  if (!isSheetSynced && typeof google !== 'undefined' && google.script && google.script.run) {
-    google.script.run
-      .withSuccessHandler(function(response) {
-        isSheetSynced = true;
-        if (response && (response.status === 'success' || response.data)) {
-          mergeSheetsData(response);
-          renderCurrentLevelDOM(currentLevel);
+  if (isSheetSynced || phase2Loading || typeof google === 'undefined' ||
+      !google.script || !google.script.run) return;
+  phase2Loading = true;
+  google.script.run
+    .withSuccessHandler(function(response) {
+      phase2Loading = false;
+      if (PHASE2_SHEETS_ADAPTER && response && response.status === 'success') {
+        try {
+          const transformed = window.LessonAdapter.apply(response, window.LESSON_DATA);
+          // Never discard answers currently typed while a remote fetch was in flight.
+          const container = document.getElementById('lesson-dynamic-container');
+          const hasTypedAnswer = !!(container && Array.from(
+            container.querySelectorAll('.lvl-input, .carry-input')
+          ).some(el => el.value && el.value.trim() !== ''));
+          window.LESSON_DATA = transformed;
+          isSheetSynced = true;
+          if (!hasTypedAnswer) renderCurrentLevelDOM(currentLevel);
+          else console.info('Lesson data updated for next level navigation; active inputs preserved.');
+        } catch (e) {
+          console.error('Phase2 adapter rejected lesson data; legacy cards preserved:', e);
         }
-      })
-      .withFailureHandler(function(err) {
-        console.warn("Sử dụng dữ liệu tích hợp:", err);
-      })
-      .getLessonData();
-  }
+      } else {
+        console.warn('Structured API unavailable; legacy lesson remains in use:', response);
+      }
+    })
+    .withFailureHandler(function(error) {
+      phase2Loading = false;
+      console.warn('Structured Sheets API failed; legacy lesson remains in use:', error);
+    })
+    .getLessonData('MATH_B020');
 }
 
 // 4. KHỞI CHẠY, LƯU NHÁP & ĐIỀU HƯỚNG Ô NHẬP
