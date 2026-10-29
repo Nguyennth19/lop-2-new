@@ -245,6 +245,9 @@ function renderCurrentLevelDOM(level) {
     const inputClass = document.getElementById(`header-class-lv${level}`);
     if (inputName) inputName.value = currentUser.name || '';
     if (inputClass) inputClass.value = currentUser.class || '';
+    if (window.LessonAdapter && typeof window.LessonAdapter.bindStableIds === 'function') {
+      window.LessonAdapter.bindStableIds(container, level, currentUser);
+    }
     bindAndRestoreLevelState(level);
   }
 }
