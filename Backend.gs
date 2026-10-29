@@ -9,6 +9,10 @@
 const SPREADSHEET_ID = '1RR8mdHv6vT9Y7tqF0moy1gSUhoDpLx7GilPwqayqt9s';
 
 function getSpreadsheetInstance() {
+  // Isolated Phase-3 test deployment may override the source via Script Properties.
+  // Never accept spreadsheet IDs from browser requests.
+  var qaId = PropertiesService.getScriptProperties().getProperty('PHASE3_QA_SPREADSHEET_ID');
+  if (qaId && /^[A-Za-z0-9_-]{20,}$/.test(qaId)) return SpreadsheetApp.openById(qaId);
   if (SPREADSHEET_ID && SPREADSHEET_ID.trim() !== '') {
     return SpreadsheetApp.openById(SPREADSHEET_ID.trim());
   }
