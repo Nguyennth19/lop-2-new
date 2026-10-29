@@ -235,7 +235,8 @@ function renderCurrentLevelDOM(level) {
   if (!container) return;
 
   let htmlContent = '';
-  if (level === 1 && typeof getHTML_LV1 === 'function') htmlContent = getHTML_LV1();
+  if (window.LessonGenericRenderer && window.LessonGenericRenderer.isActive()) htmlContent = window.LessonGenericRenderer.render(level);
+  else if (level === 1 && typeof getHTML_LV1 === 'function') htmlContent = getHTML_LV1();
   else if (level === 2 && typeof getHTML_LV2 === 'function') htmlContent = getHTML_LV2();
   else if (level === 3 && typeof getHTML_LV3 === 'function') htmlContent = getHTML_LV3();
 
@@ -272,6 +273,7 @@ function loadLessonDataFromGAS(level) {
             container.querySelectorAll('.lvl-input, .carry-input')
           ).some(el => el.value && el.value.trim() !== ''));
           window.LESSON_DATA = transformed;
+          if (window.LessonGenericRenderer) window.LessonGenericRenderer.initialize(response);
           isSheetSynced = true;
           if (!hasTypedAnswer) renderCurrentLevelDOM(currentLevel);
           else console.info('Lesson data updated for next level navigation; active inputs preserved.');
@@ -1100,6 +1102,7 @@ function randomizeSectionData(sectionId) {
 
 // Chạy xáo trộn, vẽ lại giao diện bài học mới
 function randomizeSection(sectionId) {
+  if (window.LessonGenericRenderer && window.LessonGenericRenderer.refreshRun(sectionId)) return;
   randomizeSectionData(sectionId);
   resetSection(sectionId);
   renderCurrentLevelDOM(currentLevel); // Vẽ lại HTML với dữ liệu mới
@@ -1116,6 +1119,7 @@ function randomizeSection(sectionId) {
 
 // Bấm nút Đổi Đề Mới cho toàn bộ phiếu
 function randomizeCurrentLevel() {
+  if (window.LessonGenericRenderer && window.LessonGenericRenderer.refreshLevel()) return;
   if (currentLevel === 1) {
     randomizeSectionData('lv1_ex1');
     randomizeSectionData('lv1_ex2');
