@@ -1,0 +1,57 @@
+<script>
+/* Phase3 QA — run phase3GradeDOMQA() from Apps Script browser Console.
+ * All generated elements are detached; currentUser stars/rewards restored.
+ * This runs production evaluateScope(), not a reimplemented scoring algorithm.
+ */
+function phase3GradeDOMQA() {
+  const savedStars=currentUser.stars;
+  const savedRewards=JSON.parse(JSON.stringify(currentUser.rewardedItems||{}));
+  const savedDrafts=JSON.parse(JSON.stringify(currentUser.drafts||{}));
+  const results=[];
+  const verify=(name,container,inputs,expected)=>{
+    try {
+      const all=Array.from(container.querySelectorAll('.lvl-input, .carry-input'));
+      all.forEach((el,i)=>{ el.value=inputs[i]===null?'':String(inputs[i]); });
+      const r=evaluateScope(container);
+      const ok=r.total===expected.total && r.correctCount===expected.correct &&
+        r.wrongCount===expected.wrong && r.emptyCount===expected.empty;
+      results.push({name,pass:ok,actual:r,expected});
+    }catch(e){results.push({name,pass:false,error:String(e)});}
+  };
+  const root=html=>{const el=document.createElement('div');el.innerHTML=html;return el;};
+  const setAllCorrect=el=>Array.from(el.querySelectorAll('.lvl-input,.carry-input'))
+    .map(x=>x.dataset.ans||x.dataset.expected||'');
+  try {
+    const vertical=root(renderStandardVerticalCard({
+      l:'QA',theme:'pink',n1:28,n2:15,op:'+',ans:43},'QA_V'));
+    const goodV=setAllCorrect(vertical);
+    verify('vertical-correct',vertical,goodV,{total:3,correct:3,wrong:0,empty:0});
+    verify('vertical-empty',vertical,[null,null,null],{total:3,correct:0,wrong:0,empty:3});
+    verify('vertical-wrong',vertical,['0','0','0'],{total:3,correct:0,wrong:3,empty:0});
+    const mental=root('<div data-prob-id="QA_M"><input class="lvl-input" data-type="num" data-ans="30" /></div>');
+    verify('mental-correct',mental,['30'],{total:1,correct:1,wrong:0,empty:0});
+    verify('mental-wrong',mental,['31'],{total:1,correct:0,wrong:1,empty:0});
+    const word=root('<div data-prob-id="QA_W">'+renderStructuredWordProblemSolution({
+      tomTat:'12 + 19',solveTxt:'Có tất cả số viên bi là:',n1:12,n2:19,
+      op:'+',ansNum:31,unit1:'(viên bi)',unit2:'viên bi'})+'</div>');
+    const wordInputs=Array.from(word.querySelectorAll('.lvl-input'));
+    const w=wordInputs.map(x=>x.dataset.ans);
+    verify('word-correct',word,w,{total:5,correct:5,wrong:0,empty:0});
+    verify('word-empty',word,[null,null,null,null,null],{total:5,correct:0,wrong:0,empty:5});
+    const puzzle=root(renderVerticalPuzzleCard({l:'QA',theme:'blue',op:'+',sum:43,
+      rows:[['2',{ans:8}],[{ans:1},'5'],['4','3']]},'QA_P'));
+    verify('puzzle-correct',puzzle,['8','1'],{total:2,correct:2,wrong:0,empty:0});
+    verify('puzzle-empty',puzzle,[null,null],{total:2,correct:0,wrong:0,empty:2});
+  }finally {
+    currentUser.stars=savedStars;
+    currentUser.rewardedItems=savedRewards;
+    currentUser.drafts=savedDrafts;
+    saveDataImmediate();
+  }
+  const report={status:results.every(x=>x.pass)?'PASS':'FAIL',passed:results.filter(x=>x.pass).length,
+    total:results.length,results};
+  console.table(results.map(x=>({test:x.name,pass:x.pass,error:x.error||''})));
+  console.log('PHASE3_DOM_QA_RESULT',JSON.stringify(report));
+  return report;
+}
+</script>
