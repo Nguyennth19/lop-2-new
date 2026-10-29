@@ -138,6 +138,16 @@ window.LessonGenericRenderer = (function () {
       qids.add(q.question_id);
     });
     apiData=clone(response);
+    if(!currentUser.practiceSnapshots)currentUser.practiceSnapshots={};
+    Object.keys(currentUser.practiceRuns||{}).forEach(sid=>{
+      const run=currentRun(sid),key=sid+'::'+run;
+      if(!run || currentUser.practiceSnapshots[key])return;
+      const snapshot={};
+      response.questions.filter(q=>q.section_id===sid)
+        .forEach(q=>{snapshot[q.question_id]=clone(q.payload);});
+      currentUser.practiceSnapshots[key]=snapshot;
+    });
+    saveDataImmediate();
   }
   function refreshRun(sectionId){
     if(!apiData)return false;
