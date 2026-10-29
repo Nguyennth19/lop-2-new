@@ -159,7 +159,7 @@ function validateLessonRecords_(lesson, sections, questions) {
     if (!q.question_type || !q.answer || !q.payload_json) errors.push('QUESTION '+q.question_id+': MISSING_REQUIRED');
     try {
       var p=JSON.parse(q.payload_json || '{}');
-      if (p.n1 !== undefined && p.n2 !== undefined && p.op && p.answer !== undefined) {
+      if (Array.isArray(p.terms) && p.answer !== undefined) {\n        if (p.terms.reduce(function(a,b){return a+Number(b);},0)!==Number(p.answer)) errors.push('QUESTION '+q.question_id+': WRONG_THREE_TERM_ANSWER');\n      } else if (p.n1 !== undefined && p.n2 !== undefined && p.op && p.answer !== undefined) {
         var a=Number(p.n1), b=Number(p.n2), expected=p.op==='+'?a+b:p.op==='-'?a-b:NaN;
         if (!Number.isFinite(expected) || expected!==Number(p.answer)) errors.push('QUESTION '+q.question_id+': WRONG_ANSWER');
       }
@@ -170,4 +170,13 @@ function validateLessonRecords_(lesson, sections, questions) {
     } catch(e) { errors.push('QUESTION '+q.question_id+': INVALID_JSON'); }
   });
   return errors;
+}
+
+/** Administrator QA: run from Apps Script editor; returns report, never modifies data. */
+function runLessonQA(lessonId) {
+  var result=getLessonData(lessonId || 'MATH_B020');
+  return {lessonId:lessonId || 'MATH_B020',status:result.status,code:result.code || '',
+    sections:result.sections?result.sections.length:0,
+    questions:result.questions?result.questions.length:0,
+    errors:result.errors || [], checkedAt:new Date().toISOString()};
 }
