@@ -41,6 +41,9 @@
       return Object.assign({},original,{
         id:i+1,label:'Bài toán '+(i+1),theme,
         desc:safe(p.desc),ttsText:plain(p.desc),tomTat:safe(p.summary),
+        // Old SVG belongs to original positional question; never attach to reordered questions.
+        imgSvg: (Number(original.n1)===Number(p.n1) && Number(original.n2)===Number(p.n2) &&
+          plain(original.desc)===plain(p.desc)) ? (original.imgSvg||'') : '',
         solveTxt:safe(p.solution),n1:Number(p.n1),n2:Number(p.n2),
         op:p.op,ansNum:Number(p.answer),unit1:'('+safe(p.unit)+')',unit2:safe(p.unit)
       });
@@ -105,7 +108,7 @@
         const legacyDraft=user.drafts && user.drafts['lv'+lv];
         // Save compatibility: migrate only once, without overwriting newer values.
         // Draft keys include role and ordinal suffix.
-        if(legacyDraft) Object.keys(legacyDraft).filter(k=>k.startsWith(legacyId+'_'))
+        if(legacyDraft && !user.phase2DraftMigrationComplete) Object.keys(legacyDraft).filter(k=>k.startsWith(legacyId+'_'))
           .forEach(k=>{const newKey=id+k.slice(legacyId.length);
             if(legacyDraft[newKey]===undefined)legacyDraft[newKey]=legacyDraft[k];});
         if(user.rewardedItems && user.rewardedItems[legacyId] && !user.rewardedItems[id])
@@ -113,6 +116,8 @@
         card.dataset.probId=id;
       });
     });
+    // This flag is set after first rekey; subsequent reorder must not map old positional drafts.
+    user.phase2DraftMigrationComplete=true;
   }
   window.LessonAdapter={apply,sectionMap,plain,safe,bindStableIds};
 })();
