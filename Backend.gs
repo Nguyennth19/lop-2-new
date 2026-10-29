@@ -159,7 +159,9 @@ function validateLessonRecords_(lesson, sections, questions) {
     if (!q.question_type || !q.answer || !q.payload_json) errors.push('QUESTION '+q.question_id+': MISSING_REQUIRED');
     try {
       var p=JSON.parse(q.payload_json || '{}');
-      if (Array.isArray(p.terms) && p.answer !== undefined) {\n        if (p.terms.reduce(function(a,b){return a+Number(b);},0)!==Number(p.answer)) errors.push('QUESTION '+q.question_id+': WRONG_THREE_TERM_ANSWER');\n      } else if (p.n1 !== undefined && p.n2 !== undefined && p.op && p.answer !== undefined) {
+      if (Array.isArray(p.terms) && p.answer !== undefined) {
+        if (p.terms.reduce(function(a,b){return a+Number(b);},0)!==Number(p.answer)) errors.push('QUESTION '+q.question_id+': WRONG_THREE_TERM_ANSWER');
+      } else if (p.n1 !== undefined && p.n2 !== undefined && p.op && p.answer !== undefined) {
         var a=Number(p.n1), b=Number(p.n2), expected=p.op==='+'?a+b:p.op==='-'?a-b:NaN;
         if (!Number.isFinite(expected) || expected!==Number(p.answer)) errors.push('QUESTION '+q.question_id+': WRONG_ANSWER');
       }
