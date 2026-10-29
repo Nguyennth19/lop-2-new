@@ -804,13 +804,14 @@ function evaluateScope(scopeElement) {
   let newlyRewardedStars = 0;
   scopeElement.querySelectorAll('[data-prob-id]').forEach(probEl => {
     const probId = probEl.dataset.probId;
+    const rewardKey = probEl.closest('[data-reward-owner]')?.dataset.rewardOwner || probId;
     const reqInputs = Array.from(probEl.querySelectorAll('.lvl-input, .carry-input'));
     if (reqInputs.length === 0) return;
     if (reqInputs.every(inp => inp.dataset.lastStatus === 'correct')) {
       const badge = probEl.querySelector('.prob-star-badge');
       if (badge) badge.classList.remove('hidden');
-      if (!currentUser.rewardedItems[probId]) {
-        currentUser.rewardedItems[probId] = true;
+      if (!currentUser.rewardedItems[rewardKey]) {
+        currentUser.rewardedItems[rewardKey] = true;
         currentUser.stars += 2;
         newlyRewardedStars += 2;
       }
