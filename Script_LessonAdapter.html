@@ -1,0 +1,84 @@
+<script>
+/* Phase 2 development adapter: Google Sheets structured API -> existing four card types.
+   Designed to coexist with the legacy UI until renderer parity QA passes. */
+(function () {
+  'use strict';
+  const THEMES = ['pink','blue','yellow','green','purple','orange'];
+  const sectionMap = {
+    B020_L1_E1: ['lv1','ex1'],
+    B020_L1_E2A: ['lv1','ex2',0],
+    B020_L1_E2B: ['lv1','ex2',1],
+    B020_L1_E2C: ['lv1','ex2',2],
+    B020_L1_E3: ['lv1','ex3'],
+    B020_L2_E1: ['lv2','problems'],
+    B020_L3_E1: ['lv3','ex1'],
+    B020_L3_E2: ['lv3','ex2'],
+    B020_L3_E3: ['lv3','ex3'],
+    B020_L3_E4: ['lv3','ex4']
+  };
+  function plain(value) {
+    return String(value == null ? '' : value)
+      .replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>');
+  }
+  function safe(value) {
+    return plain(value).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+  function assert(condition, msg) { if (!condition) throw Error('LessonAdapter: '+msg); }
+  function transform(q, previous, i) {
+    const p=q.payload, theme=THEMES[i%THEMES.length];
+    assert(p && typeof p==='object','missing payload '+q.question_id);
+    if (q.question_type==='VERTICAL_ADD') {
+      assert(Number.isFinite(Number(p.n1))&&Number.isFinite(Number(p.n2)),'invalid operands '+q.question_id);
+      return {l:(i+1)+')', n1:Number(p.n1),n2:Number(p.n2),op:p.op,ans:Number(p.answer),theme};
+    }
+    if (q.question_type==='MENTAL_ADD') {
+      return {c1:safe(p.n1),c2:safe(p.n2),op:safe(p.op),eq:'=',ans:Number(p.answer)};
+    }
+    if (q.question_type==='WORD_PROBLEM') {
+      const original=previous||{};
+      return Object.assign({},original,{
+        id:i+1,label:'Bài toán '+(i+1),theme,
+        desc:safe(p.desc),ttsText:plain(p.desc),tomTat:safe(p.summary),
+        solveTxt:safe(p.solution),n1:Number(p.n1),n2:Number(p.n2),
+        op:p.op,ansNum:Number(p.answer),unit1:'('+safe(p.unit)+')',unit2:safe(p.unit)
+      });
+    }
+    if (q.question_type==='MISSING_DIGIT') {
+      assert(Array.isArray(p.rows)&&p.rows.length===3,'invalid puzzle '+q.question_id);
+      return {l:p.originalLabel || (i+1)+')',theme,op:p.op||'+',
+        sum:Number(p.sum),rows:p.rows};
+    }
+    throw Error('LessonAdapter: unsupported type '+q.question_type);
+  }
+  function apply(api, current) {
+    assert(api && api.status==='success' && api.lessonId==='MATH_B020','API unavailable or mismatched');
+    assert(Array.isArray(api.sections)&&Array.isArray(api.questions),'missing collections');
+    const sectionById=Object.create(null);
+    api.sections.forEach(s=>{assert(!sectionById[s.section_id],'duplicate section '+s.section_id);sectionById[s.section_id]=s;});
+    const bySection=Object.create(null),ids=new Set();
+    api.questions.forEach(q=>{
+      assert(!ids.has(q.question_id),'duplicate question '+q.question_id);ids.add(q.question_id);
+      assert(sectionById[q.section_id],'orphan question '+q.question_id);
+      (bySection[q.section_id]||(bySection[q.section_id]=[])).push(q);
+    });
+    const draft=JSON.parse(JSON.stringify(current));
+    // Preserve non-JSON inline SVG illustrations (stored as strings in original lesson).
+    Object.keys(sectionMap).forEach(id=>{
+      const path=sectionMap[id],questions=(bySection[id]||[]).sort((a,b)=>Number(a.sort_order)-Number(b.sort_order));
+      const type=sectionById[id] && sectionById[id].exercise_type;
+      assert(type,'missing section '+id);
+      questions.forEach(q=>assert(q.question_type===type,'type mismatch '+q.question_id));
+      const existing=path.length===3?draft[path[0]][path[1]][path[2]].items:draft[path[0]][path[1]];
+      const mapped=questions.map((q,i)=>transform(q,existing[i],i));
+      if(path.length===3)draft[path[0]][path[1]][path[2]].items=mapped;
+      else draft[path[0]][path[1]]=mapped;
+    });
+    draft.id='toan_b20'; draft.lessonId=api.lessonId;
+    draft.contentVersion=api.schemaVersion; draft.sourceReviewPending=true;
+    return draft;
+  }
+  window.LessonAdapter={apply,sectionMap,plain,safe};
+})();
+</script>
