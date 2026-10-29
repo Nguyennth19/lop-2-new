@@ -37,19 +37,20 @@ window.LessonGenericRenderer = (function () {
   }
   function renderCard(q,i){
     const id=cardId(q),item=makeItem(q,i),type=q.question_type;
-    if(type==='VERTICAL_ADD')return renderStandardVerticalCard(item,id);
-    if(type==='MISSING_DIGIT')return renderVerticalPuzzleCard(item,id);
-    if(type==='WORD_PROBLEM')return '<div data-prob-id="'+esc(id)+'" class="relative bg-white rounded-2xl border-2 border-amber-200 p-4 space-y-3">'+
+    const wrap=html=>'<div data-reward-owner="'+esc(q.question_id)+'">'+html+'</div>';
+    if(type==='VERTICAL_ADD')return wrap(renderStandardVerticalCard(item,id));
+    if(type==='MISSING_DIGIT')return wrap(renderVerticalPuzzleCard(item,id));
+    if(type==='WORD_PROBLEM')return wrap('<div data-prob-id="'+esc(id)+'" class="relative bg-white rounded-2xl border-2 border-amber-200 p-4 space-y-3">'+
       '<div class="flex items-center justify-between"><strong class="text-sky-800">Bài '+(i+1)+'</strong>'+
       '<span class="prob-star-badge hidden text-amber-600 font-bold">+2⭐</span></div>'+
-      '<p class="font-bold text-slate-900">'+item.desc+'</p>'+renderStructuredWordProblemSolution(item)+'</div>';
+      '<p class="font-bold text-slate-900">'+item.desc+'</p>'+renderStructuredWordProblemSolution(item)+'</div>');
     const t=THEMES[themes[i%6]],mode=getEffectiveInputMode('numeric');
-    return '<div data-prob-id="'+esc(id)+'" class="relative rounded-2xl border-2 '+t.border+' '+t.bg+' p-3">'+
+    return wrap('<div data-prob-id="'+esc(id)+'" class="relative rounded-2xl border-2 '+t.border+' '+t.bg+' p-3">'+
       '<div class="font-math text-lg font-bold flex items-center justify-center flex-wrap gap-2">'+
       '<span>'+item.c1+'</span><span>'+item.op+'</span><span>'+item.c2+'</span><span>=</span>'+
       '<input type="text" maxlength="3" inputmode="'+mode+'" data-type="num" data-ans="'+item.ans+'" '+
       'class="lvl-input w-16 text-center bg-white border border-dashed border-sky-400 rounded-xl p-2"/>'+
-      '</div><span class="prob-star-badge hidden text-amber-600 text-xs font-bold">+2⭐</span></div>';
+      '</div><span class="prob-star-badge hidden text-amber-600 text-xs font-bold">+2⭐</span></div>');
   }
   function sectionHtml(s){
     const qs=sectionQuestions(s.section_id), sectionId='sheet_'+s.section_id;
