@@ -30,7 +30,7 @@ function include(filename) {
 /**
  * API: Đọc dữ liệu từ 2 Sheet 'BaiTap_PhepTinh' và 'BaiTap_LoiVan'
  */
-function getLessonData() {
+function getLegacyLessonData() {
   try {
     var ss = getSpreadsheetInstance();
     if (!ss) {
@@ -100,4 +100,83 @@ function saveStudentProgress(studentData) {
   } catch (error) {
     return { status: "error", message: error.toString() };
   }
+}
+
+/**
+ * PHASE 1: Structured lesson API. Old two-sheet API is retained as
+ * getLegacyLessonData() so original demo can be restored from main.
+ * Read-only lesson content; no changes to student progress endpoint.
+ */
+function getLessonData(lessonId) {
+  // Backward compatibility: old client invokes getLessonData() without an ID.
+  if (!lessonId) return getLegacyLessonData();
+  var id = String(lessonId).trim();
+  if (!/^[A-Z0-9_]{3,64}$/.test(id)) return { status: 'error', code: 'INVALID_LESSON_ID' };
+  try {
+    var ss = getSpreadsheetInstance();
+    var required = ['LESSONS', 'SECTIONS', 'QUESTIONS', 'CONTENT', 'SOURCES', 'ASSETS'];
+    var tables = {};
+    required.forEach(function(name) {
+      var sheet = ss.getSheetByName(name);
+      if (!sheet) throw new Error('MISSING_SHEET: ' + name);
+      var values = sheet.getDataRange().getValues();
+      var headings = values.shift().map(String);
+      tables[name] = values.filter(function(r) { return r.some(function(c) { return c !== ''; }); })
+        .map(function(row) { var o = {}; headings.forEach(function(h, i) { o[h] = row[i]; }); return o; });
+    });
+    var lesson = tables.LESSONS.filter(function(x) { return x.lesson_id === id; })[0];
+    if (!lesson) return { status: 'error', code: 'LESSON_NOT_FOUND', lessonId: id };
+    var sections = tables.SECTIONS.filter(function(s) { return s.lesson_id === id; });
+    var sectionIds = {};
+    sections.forEach(function(s) { sectionIds[s.section_id] = true; });
+    var questions = tables.QUESTIONS.filter(function(q) { return !!sectionIds[q.section_id]; });
+    var content = tables.CONTENT.filter(function(c) { return c.lesson_id === id; });
+    var errors = validateLessonRecords_(lesson, sections, questions);
+    if (errors.length) return { status: 'error', code: 'VALIDATION_FAILED', errors: errors, lessonId: id };
+    questions.forEach(function(q) {
+      if (q.payload_json) { q.payload = JSON.parse(q.payload_json); }
+      delete q.payload_json;
+    });
+    sections.sort(function(a,b) { return Number(a.sort_order)-Number(b.sort_order); });
+    questions.sort(function(a,b) { return Number(a.sort_order)-Number(b.sort_order); });
+    return {status:'success', schemaVersion:'1.0', lessonId:id, lesson:lesson,
+      sections:sections, questions:questions, content:content,
+      sources:tables.SOURCES, assets:tables.ASSETS};
+  } catch(e) { return {status:'error', code:'READ_FAILED', message:String(e)}; }
+}
+function validateLessonRecords_(lesson, sections, questions) {
+  var errors=[], seen={};
+  function unique(id, kind) { if (!id) errors.push(kind+': MISSING_ID'); else if (seen[kind+':'+id]) errors.push(kind+': DUPLICATE_ID '+id); else seen[kind+':'+id]=true; }
+  unique(lesson.lesson_id,'LESSON');
+  var sectionIds={};
+  sections.forEach(function(s) {
+    unique(s.section_id,'SECTION'); sectionIds[s.section_id]=true;
+    if (!s.exercise_type || !s.level) errors.push('SECTION '+s.section_id+': MISSING_REQUIRED');
+  });
+  questions.forEach(function(q) {
+    unique(q.question_id,'QUESTION');
+    if (!sectionIds[q.section_id]) errors.push('QUESTION '+q.question_id+': INVALID_SECTION');
+    if (!q.question_type || !q.answer || !q.payload_json) errors.push('QUESTION '+q.question_id+': MISSING_REQUIRED');
+    try {
+      var p=JSON.parse(q.payload_json || '{}');
+      if (Array.isArray(p.terms) && p.answer !== undefined) {\n        if (p.terms.reduce(function(a,b){return a+Number(b);},0)!==Number(p.answer)) errors.push('QUESTION '+q.question_id+': WRONG_THREE_TERM_ANSWER');\n      } else if (p.n1 !== undefined && p.n2 !== undefined && p.op && p.answer !== undefined) {
+        var a=Number(p.n1), b=Number(p.n2), expected=p.op==='+'?a+b:p.op==='-'?a-b:NaN;
+        if (!Number.isFinite(expected) || expected!==Number(p.answer)) errors.push('QUESTION '+q.question_id+': WRONG_ANSWER');
+      }
+      if (p.rows) {
+        var v=function(row){return Number(row.slice(0,2).map(function(c){return typeof c==='object'?c.ans:c;}).join(''));};
+        if (v(p.rows[0])+v(p.rows[1])!==Number(p.sum)) errors.push('QUESTION '+q.question_id+': WRONG_PUZZLE_ANSWER');
+      }
+    } catch(e) { errors.push('QUESTION '+q.question_id+': INVALID_JSON'); }
+  });
+  return errors;
+}
+
+/** Administrator QA: run from Apps Script editor; returns report, never modifies data. */
+function runLessonQA(lessonId) {
+  var result=getLessonData(lessonId || 'MATH_B020');
+  return {lessonId:lessonId || 'MATH_B020',status:result.status,code:result.code || '',
+    sections:result.sections?result.sections.length:0,
+    questions:result.questions?result.questions.length:0,
+    errors:result.errors || [], checkedAt:new Date().toISOString()};
 }
