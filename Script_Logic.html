@@ -266,7 +266,10 @@ function loadLessonDataFromGAS(level) {
       phase2Loading = false;
       if (PHASE2_SHEETS_ADAPTER && response && response.status === 'success') {
         try {
-          const transformed = window.LessonAdapter.apply(response, window.LESSON_DATA);
+          const targetLessonId = window.ACTIVE_LESSON_ID || 'MATH_B020';
+          const transformed = targetLessonId === 'MATH_B020'
+            ? window.LessonAdapter.apply(response, window.LESSON_DATA)
+            : window.LESSON_DATA;
           // Never discard answers currently typed while a remote fetch was in flight.
           const container = document.getElementById('lesson-dynamic-container');
           const hasTypedAnswer = !!(container && Array.from(
@@ -288,7 +291,7 @@ function loadLessonDataFromGAS(level) {
       phase2Loading = false;
       console.warn('Structured Sheets API failed; legacy lesson remains in use:', error);
     })
-    .getLessonData('MATH_B020');
+    .getLessonData(window.ACTIVE_LESSON_ID || 'MATH_B020');
 }
 
 // 4. KHỞI CHẠY, LƯU NHÁP & ĐIỀU HƯỚNG Ô NHẬP
