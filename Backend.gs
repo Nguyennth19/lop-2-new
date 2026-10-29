@@ -17,6 +17,9 @@ function getSpreadsheetInstance() {
 
 function doGet(e) {
   var template = HtmlService.createTemplateFromFile('Index');
+  var requested = e && e.parameter && e.parameter.lesson;
+  var lessonId = /^[A-Z0-9_]{3,64}$/.test(String(requested || '')) ? requested : 'MATH_B020';
+  template.activeLessonIdJson = JSON.stringify(lessonId);
   return template.evaluate()
     .setTitle('KidLearn Lớp 2 - Hệ Thống Phiếu Bài Tập Tương Tác')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
@@ -181,4 +184,19 @@ function runLessonQA(lessonId) {
     sections:result.sections?result.sections.length:0,
     questions:result.questions?result.questions.length:0,
     errors:result.errors || [], checkedAt:new Date().toISOString()};
+}
+
+/** Phase 3: available lesson metadata only; does not imply pedagogical approval. */
+function getLessonCatalog() {
+  try {
+    var sheet = getSpreadsheetInstance().getSheetByName('LESSONS');
+    if (!sheet) return {status:'error',code:'MISSING_SHEET'};
+    var rows = sheet.getDataRange().getValues();
+    var headings = rows.shift().map(String);
+    var allowed = ['lesson_id','title','subject','status','qa_status'];
+    var lessons = rows.filter(function(r){return r.some(function(v){return v!=='';});})
+      .map(function(r){var o={};headings.forEach(function(h,i){if(allowed.indexOf(h)!==-1)o[h]=r[i];});return o;})
+      .filter(function(o){return !!o.lesson_id;});
+    return {status:'success',lessons:lessons};
+  } catch(e) {return {status:'error',code:'CATALOG_READ_FAILED',message:String(e)};}
 }
