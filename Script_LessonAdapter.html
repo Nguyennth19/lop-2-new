@@ -97,6 +97,7 @@
       ['B020_L3_E1','lv3_ex1_',3],['B020_L3_E2','lv3_ex2_',3],
       ['B020_L3_E3','lv3_ex3_',3],['B020_L3_E4','lv3_ex4_',3]
     ];
+    let assigned=0;
     mappings.forEach(([sid, prefix, lv])=>{
       if (lv!==Number(level)) return;
       const ids=activeQuestionIds[sid]||[];
@@ -105,19 +106,20 @@
         const card=Array.from(root.querySelectorAll('[data-prob-id]'))
           .find(el=>el.dataset.probId===legacyId);
         if(!card) return;
+        assigned++;
         const legacyDraft=user.drafts && user.drafts['lv'+lv];
         // Save compatibility: migrate only once, without overwriting newer values.
         // Draft keys include role and ordinal suffix.
         if(legacyDraft && !user.phase2DraftMigrationComplete) Object.keys(legacyDraft).filter(k=>k.startsWith(legacyId+'_'))
           .forEach(k=>{const newKey=id+k.slice(legacyId.length);
             if(legacyDraft[newKey]===undefined)legacyDraft[newKey]=legacyDraft[k];});
-        if(user.rewardedItems && user.rewardedItems[legacyId] && !user.rewardedItems[id])
+        if(!user.phase2DraftMigrationComplete && user.rewardedItems && user.rewardedItems[legacyId] && !user.rewardedItems[id])
           user.rewardedItems[id]=true;
         card.dataset.probId=id;
       });
     });
     // This flag is set after first rekey; subsequent reorder must not map old positional drafts.
-    user.phase2DraftMigrationComplete=true;
+    if(assigned>0) user.phase2DraftMigrationComplete=true;
   }
   window.LessonAdapter={apply,sectionMap,plain,safe,bindStableIds};
 })();
