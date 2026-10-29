@@ -9,8 +9,66 @@ window.LessonGenericRenderer = (function () {
   const text=s=>window.LessonAdapter.plain(s);
   function clone(x){return JSON.parse(JSON.stringify(x));}
   function sectionQuestions(sid){
-    return apiData.questions.filter(q=>q.section_id===sid)
+    const rows=apiData.questions.filter(q=>q.section_id===sid)
       .sort((a,b)=>Number(a.sort_order)-Number(b.sort_order));
+    const run=currentRun(sid);
+    if(!run)return rows;
+    const key=sid+'::'+run, snapshots=currentUser.practiceSnapshots||{};
+    const snapshot=snapshots[key];
+    // A reload never regenerates a previously saved run. Missing snapshots
+    // must show a specific error rather than silently changing answers.
+    if(!snapshot)throw Error('Missing saved practice variant: '+key);
+    return rows.map(q=>{
+      const copy=clone(q);
+      if(snapshot[q.question_id])copy.payload=clone(snapshot[q.question_id]);
+      return copy;
+    });
+  }
+  function pick(min,max){return Math.floor(Math.random()*(max-min+1))+min;}
+  function carryPair(used){
+    for(let attempt=0;attempt<400;attempt++){
+      const a=pick(11,88),b=pick(11,88);
+      if(a+b>99 || a%10+b%10<10)continue;
+      const key=a+'+'+b;
+      if(used.has(key))continue;
+      used.add(key);return {n1:a,n2:b,op:'+',answer:a+b};
+    }
+    throw Error('Could not generate unique addition');
+  }
+  function makeVariant(q,used){
+    const p=clone(q.payload);
+    if(q.question_type==='VERTICAL_ADD')return Object.assign(p,carryPair(used));
+    if(q.question_type==='MENTAL_ADD'){
+      if(Array.isArray(p.terms)){
+        const a=pick(12,39),b=10-(a%10)+10*pick(1,2),c=pick(1,9);
+        const terms=[a,b,c],key=terms.join('+');
+        if(used.has(key))return makeVariant(q,used);
+        used.add(key);p.terms=terms;p.n1=a+' + '+b;p.n2=c;p.answer=a+b+c;
+      }else{
+        const pair=carryPair(used);
+        Object.assign(p,pair);
+      }
+      return p;
+    }
+    if(q.question_type==='MISSING_DIGIT'){
+      const pair=carryPair(used);
+      const digits=[String(pair.n1).split(''),String(pair.n2).split(''),String(pair.answer).split('')];
+      // Maintain which cells are hidden in the source puzzle, and regenerate answers.
+      p.rows=p.rows.map((row,ri)=>row.map((cell,ci)=>
+        typeof cell==='object'&&cell!==null ? {ans:Number(digits[ri][ci])}:digits[ri][ci]));
+      p.sum=pair.answer;p.answer=pair.answer;return p;
+    }
+    // Word problems are fixed: changing numbers without rewriting and
+    // approving natural-language contexts could create a misleading question.
+    return p;
+  }
+  function buildSnapshot(sid,run){
+    const rows=apiData.questions.filter(q=>q.section_id===sid)
+      .sort((a,b)=>Number(a.sort_order)-Number(b.sort_order));
+    const used=new Set(),snapshot={};
+    rows.forEach(q=>{snapshot[q.question_id]=makeVariant(q,used);});
+    if(!currentUser.practiceSnapshots)currentUser.practiceSnapshots={};
+    currentUser.practiceSnapshots[sid+'::'+run]=snapshot;
   }
   function currentRun(sid){
     const runs=currentUser.practiceRuns||{};
@@ -59,7 +117,7 @@ window.LessonGenericRenderer = (function () {
     return '<section id="sec-'+sectionId+'" class="space-y-3">'+
       '<h3 class="font-baloo text-xl font-extrabold text-sky-900">'+esc(s.title)+'</h3>'+
       '<div class="grid '+layout+' gap-3">'+qs.map(renderCard).join('')+'</div>'+
-      renderSectionControlBar(sectionId).replace('Đổi đề bài này','Làm lượt mới')+'</section>';
+      renderSectionControlBar(sectionId).replace('Đổi đề bài này','Tạo lượt luyện mới')+'</section>';
   }
   function render(level){
     if(!apiData) return null;
@@ -67,7 +125,7 @@ window.LessonGenericRenderer = (function () {
       .sort((a,b)=>Number(a.sort_order)-Number(b.sort_order));
     return getHeaderHTML(esc(apiData.lesson.title),'LV'+level+' — '+sections.length+' phần học',level)+
       '<div class="p-4 sm:p-7 space-y-7 bg-[#fffdf9]">'+
-      sections.map(sectionHtml).join('')+getFooterButtons().replace('ĐỔI ĐỀ MỚI LUYỆN THÊM','LÀM LƯỢT MỚI')+'</div>';
+      sections.map(sectionHtml).join('')+getFooterButtons().replace('ĐỔI ĐỀ MỚI LUYỆN THÊM','TẠO LƯỢT LUYỆN MỚI')+'</div>';
   }
   function initialize(response){
     if(!response || response.status!=='success')throw Error('API status not success');
@@ -86,7 +144,9 @@ window.LessonGenericRenderer = (function () {
     const sid=sectionId.startsWith('sheet_')?sectionId.slice(6):sectionId;
     if(!apiData.sections.some(s=>s.section_id===sid))return false;
     if(!currentUser.practiceRuns)currentUser.practiceRuns={};
-    currentUser.practiceRuns[sid]=currentRun(sid)+1;
+    const next=currentRun(sid)+1;
+    buildSnapshot(sid,next);
+    currentUser.practiceRuns[sid]=next;
     // A new attempt gets its own draft/reward namespace. Previous attempts remain recorded.
     saveDataImmediate();
     renderCurrentLevelDOM(currentLevel);
@@ -96,7 +156,9 @@ window.LessonGenericRenderer = (function () {
     if(!apiData)return false;
     apiData.sections.filter(s=>Number(s.level)===Number(currentLevel))
       .forEach(s=>{if(!currentUser.practiceRuns)currentUser.practiceRuns={};
-        currentUser.practiceRuns[s.section_id]=currentRun(s.section_id)+1;});
+        const next=currentRun(s.section_id)+1;
+        buildSnapshot(s.section_id,next);
+        currentUser.practiceRuns[s.section_id]=next;});
     saveDataImmediate();
     renderCurrentLevelDOM(currentLevel);
     return true;
