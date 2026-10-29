@@ -1,0 +1,106 @@
+<script>
+/* Phase 2 generic renderer — sections, questions and attempt IDs from Sheets.
+   Experimental: runs only after successful structured API response. */
+window.LessonGenericRenderer = (function () {
+  'use strict';
+  let apiData = null;
+  const themes=['pink','blue','yellow','green','purple','orange'];
+  const esc=s=>window.LessonAdapter.safe(s);
+  const text=s=>window.LessonAdapter.plain(s);
+  function clone(x){return JSON.parse(JSON.stringify(x));}
+  function sectionQuestions(sid){
+    return apiData.questions.filter(q=>q.section_id===sid)
+      .sort((a,b)=>Number(a.sort_order)-Number(b.sort_order));
+  }
+  function currentRun(sid){
+    const runs=currentUser.practiceRuns||{};
+    return Number(runs[sid]||0);
+  }
+  function cardId(q){
+    const run=currentRun(q.section_id);
+    return run ? q.question_id+'__RUN_'+run : q.question_id;
+  }
+  function makeItem(q,index){
+    const p=q.payload;
+    if(q.question_type==='VERTICAL_ADD')
+      return {l:(index+1)+')',theme:themes[index%6],n1:Number(p.n1),n2:Number(p.n2),op:p.op,ans:Number(p.answer)};
+    if(q.question_type==='MISSING_DIGIT')
+      return {l:esc(p.originalLabel||(index+1)+')'),theme:themes[index%6],rows:p.rows,op:p.op||'+',sum:Number(p.sum)};
+    if(q.question_type==='WORD_PROBLEM')
+      return {theme:themes[index%6],desc:esc(p.desc),ttsText:text(p.desc),
+        tomTat:esc(p.summary),solveTxt:esc(p.solution),
+        n1:Number(p.n1),n2:Number(p.n2),op:p.op,ansNum:Number(p.answer),
+        unit1:'('+esc(p.unit)+')',unit2:esc(p.unit)};
+    if(q.question_type==='MENTAL_ADD')
+      return {c1:esc(p.n1),c2:esc(p.n2),op:esc(p.op),ans:Number(p.answer)};
+    throw Error('Unsupported type: '+q.question_type);
+  }
+  function renderCard(q,i){
+    const id=cardId(q),item=makeItem(q,i),type=q.question_type;
+    if(type==='VERTICAL_ADD')return renderStandardVerticalCard(item,id);
+    if(type==='MISSING_DIGIT')return renderVerticalPuzzleCard(item,id);
+    if(type==='WORD_PROBLEM')return '<div data-prob-id="'+esc(id)+'" class="relative bg-white rounded-2xl border-2 border-amber-200 p-4 space-y-3">'+
+      '<div class="flex items-center justify-between"><strong class="text-sky-800">Bài '+(i+1)+'</strong>'+
+      '<span class="prob-star-badge hidden text-amber-600 font-bold">+2⭐</span></div>'+
+      '<p class="font-bold text-slate-900">'+item.desc+'</p>'+renderStructuredWordProblemSolution(item)+'</div>';
+    const t=THEMES[themes[i%6]],mode=getEffectiveInputMode('numeric');
+    return '<div data-prob-id="'+esc(id)+'" class="relative rounded-2xl border-2 '+t.border+' '+t.bg+' p-3">'+
+      '<div class="font-math text-lg font-bold flex items-center justify-center flex-wrap gap-2">'+
+      '<span>'+item.c1+'</span><span>'+item.op+'</span><span>'+item.c2+'</span><span>=</span>'+
+      '<input type="text" maxlength="3" inputmode="'+mode+'" data-type="num" data-ans="'+item.ans+'" '+
+      'class="lvl-input w-16 text-center bg-white border border-dashed border-sky-400 rounded-xl p-2"/>'+
+      '</div><span class="prob-star-badge hidden text-amber-600 text-xs font-bold">+2⭐</span></div>';
+  }
+  function sectionHtml(s){
+    const qs=sectionQuestions(s.section_id), sectionId='sheet_'+s.section_id;
+    const layout=s.exercise_type==='WORD_PROBLEM'?'grid-cols-1 md:grid-cols-2':
+      s.exercise_type==='MENTAL_ADD'?'grid-cols-1 sm:grid-cols-3':'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5';
+    return '<section id="sec-'+sectionId+'" class="space-y-3">'+
+      '<h3 class="font-baloo text-xl font-extrabold text-sky-900">'+esc(s.title)+'</h3>'+
+      '<div class="grid '+layout+' gap-3">'+qs.map(renderCard).join('')+'</div>'+
+      renderSectionControlBar(sectionId)+'</section>';
+  }
+  function render(level){
+    if(!apiData) return null;
+    const sections=apiData.sections.filter(s=>Number(s.level)===Number(level))
+      .sort((a,b)=>Number(a.sort_order)-Number(b.sort_order));
+    return getHeaderHTML(esc(apiData.lesson.title),'LV'+level+' — '+sections.length+' phần học',level)+
+      '<div class="p-4 sm:p-7 space-y-7 bg-[#fffdf9]">'+
+      sections.map(sectionHtml).join('')+getFooterButtons()+'</div>';
+  }
+  function initialize(response){
+    if(!response || response.status!=='success')throw Error('API status not success');
+    if(!Array.isArray(response.sections)||!Array.isArray(response.questions))throw Error('Invalid collections');
+    const sids=new Set(),qids=new Set();
+    response.sections.forEach(s=>{if(!s.section_id||sids.has(s.section_id))throw Error('Duplicate/missing section');sids.add(s.section_id);});
+    response.questions.forEach(q=>{
+      if(!q.question_id||qids.has(q.question_id)||!sids.has(q.section_id))throw Error('Invalid question link');
+      if(!['VERTICAL_ADD','MENTAL_ADD','WORD_PROBLEM','MISSING_DIGIT'].includes(q.question_type))throw Error('Unsupported question type');
+      qids.add(q.question_id);
+    });
+    apiData=clone(response);
+  }
+  function refreshRun(sectionId){
+    if(!apiData)return false;
+    const sid=sectionId.startsWith('sheet_')?sectionId.slice(6):sectionId;
+    if(!apiData.sections.some(s=>s.section_id===sid))return false;
+    if(!currentUser.practiceRuns)currentUser.practiceRuns={};
+    currentUser.practiceRuns[sid]=currentRun(sid)+1;
+    // A new attempt gets its own draft/reward namespace. Previous attempts remain recorded.
+    saveDataImmediate();
+    renderCurrentLevelDOM(currentLevel);
+    return true;
+  }
+  function refreshLevel(){
+    if(!apiData)return false;
+    apiData.sections.filter(s=>Number(s.level)===Number(currentLevel))
+      .forEach(s=>{if(!currentUser.practiceRuns)currentUser.practiceRuns={};
+        currentUser.practiceRuns[s.section_id]=currentRun(s.section_id)+1;});
+    saveDataImmediate();
+    renderCurrentLevelDOM(currentLevel);
+    return true;
+  }
+  return {initialize,render,refreshRun,refreshLevel,isActive:()=>!!apiData,
+    questionCount:()=>apiData?apiData.questions.length:0};
+})();
+</script>
