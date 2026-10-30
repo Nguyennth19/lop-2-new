@@ -172,6 +172,22 @@ function validateLessonRecords_(lesson, sections, questions) {
         var a=Number(p.n1), b=Number(p.n2), expected=p.op==='+'?a+b:p.op==='-'?a-b:NaN;
         if (!Number.isFinite(expected) || expected!==Number(p.answer)) errors.push('QUESTION '+q.question_id+': WRONG_ANSWER');
       }
+      // Structured interaction payloads must be coherent; no implicit math scope change.
+      if (lesson.lesson_id==='MATH_B021' &&
+        ['CHOICE','MATCH_PAIRS','DRAG_TAP'].indexOf(q.question_type)!==-1) {
+        if (!p.prompt || typeof p.prompt!=='string')errors.push('QUESTION '+q.question_id+': INTERACTIVE_PROMPT_REQUIRED');
+        if(q.question_type==='MATCH_PAIRS'){
+          if(!Array.isArray(p.options)||p.options.length<2||!Array.isArray(p.pairs)||p.pairs.length<2 ||
+            p.pairs.some(function(pair){return typeof pair.left!=='string' ||
+              !Number.isInteger(pair.rightIndex)||pair.rightIndex<0||pair.rightIndex>=p.options.length;}))
+            errors.push('QUESTION '+q.question_id+': INVALID_MATCH_PAYLOAD');
+        }else{
+          var opts=q.question_type==='CHOICE'?p.options:p.tokens;
+          if(!Array.isArray(opts)||opts.length<2||!Number.isInteger(p.correctIndex) ||
+            p.correctIndex<0||p.correctIndex>=opts.length)
+            errors.push('QUESTION '+q.question_id+': INVALID_CHOICE_PAYLOAD');
+        }
+      }
       // B021: review of carrying addition in 100; unlike B020, a one-digit addend is allowed.
       if (lesson.lesson_id === 'MATH_B021') {
         if (['VERTICAL_ADD','MENTAL_ADD','WORD_PROBLEM'].indexOf(q.question_type) !== -1) {
@@ -183,7 +199,7 @@ function validateLessonRecords_(lesson, sections, questions) {
               n21a + n21b !== Number(q.answer)) {
             errors.push('QUESTION '+q.question_id+': B021_CURRICULUM_FORMAT_MISMATCH');
           }
-        } else if (['MISSING_DIGIT','VISUAL_COMPARE','VISUAL_NUMBER'].indexOf(q.question_type) === -1) {
+        } else if (['MISSING_DIGIT','CHOICE','MATCH_PAIRS','DRAG_TAP'].indexOf(q.question_type) === -1) {
           errors.push('QUESTION '+q.question_id+': B021_UNSUPPORTED_FORMAT');
         }
       }
