@@ -172,6 +172,22 @@ function validateLessonRecords_(lesson, sections, questions) {
         var a=Number(p.n1), b=Number(p.n2), expected=p.op==='+'?a+b:p.op==='-'?a-b:NaN;
         if (!Number.isFinite(expected) || expected!==Number(p.answer)) errors.push('QUESTION '+q.question_id+': WRONG_ANSWER');
       }
+      // B020 curriculum gate: exactly two two-digit addends with carrying, result <= 99.
+      if (lesson.lesson_id === 'MATH_B020') {
+        var n1, n2;
+        if (p.rows && p.rows.length === 3) {
+          var numberFromRow = function(row) { return Number(row.slice(0,2).map(function(c){return typeof c==='object'?c.ans:c;}).join('')); };
+          n1 = numberFromRow(p.rows[0]); n2 = numberFromRow(p.rows[1]);
+        } else {
+          n1=Number(p.n1); n2=Number(p.n2);
+        }
+        var isTwoDigit = function(n){return Number.isInteger(n) && n >= 10 && n <= 99;};
+        if (p.op !== '+' || Array.isArray(p.terms) || !isTwoDigit(n1) || !isTwoDigit(n2) ||
+            n1 % 10 + n2 % 10 < 10 || n1 + n2 > 99 ||
+            n1 + n2 !== Number(q.answer)) {
+          errors.push('QUESTION '+q.question_id+': B020_CURRICULUM_FORMAT_MISMATCH');
+        }
+      }
       if (p.rows) {
         var v=function(row){return Number(row.slice(0,2).map(function(c){return typeof c==='object'?c.ans:c;}).join(''));};
         if (v(p.rows[0])+v(p.rows[1])!==Number(p.sum)) errors.push('QUESTION '+q.question_id+': WRONG_PUZZLE_ANSWER');
