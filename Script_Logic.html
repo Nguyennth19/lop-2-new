@@ -235,7 +235,13 @@ function renderCurrentLevelDOM(level) {
   if (!container) return;
 
   let htmlContent = '';
-  if (window.LessonGenericRenderer && window.LessonGenericRenderer.isActive()) htmlContent = window.LessonGenericRenderer.render(level);
+  if ((window.ACTIVE_LESSON_ID || 'MATH_B020') !== 'MATH_B020' &&
+      !(window.LessonGenericRenderer && window.LessonGenericRenderer.isActive())) {
+    htmlContent = '<div role="status" class="p-8 text-center font-bold text-amber-900">'+
+      (phase3LessonLoadError ? 'Không thể tải bài học từ Google Sheets. Vui lòng thử lại hoặc báo người quản lý.' :
+      'Đang tải dữ liệu bài học từ Google Sheets...')+'</div>';
+  }
+  else if (window.LessonGenericRenderer && window.LessonGenericRenderer.isActive()) htmlContent = window.LessonGenericRenderer.render(level);
   else if (level === 1 && typeof getHTML_LV1 === 'function') htmlContent = getHTML_LV1();
   else if (level === 2 && typeof getHTML_LV2 === 'function') htmlContent = getHTML_LV2();
   else if (level === 3 && typeof getHTML_LV3 === 'function') htmlContent = getHTML_LV3();
@@ -256,6 +262,7 @@ function renderCurrentLevelDOM(level) {
 // DEVELOPMENT ONLY: phase 2 structured data integration on non-production branch.
 const PHASE2_SHEETS_ADAPTER = true;
 let phase2Loading = false;
+let phase3LessonLoadError = false;
 function loadLessonDataFromGAS(level) {
   renderCurrentLevelDOM(level);
   if (isSheetSynced || phase2Loading || typeof google === 'undefined' ||
@@ -277,19 +284,26 @@ function loadLessonDataFromGAS(level) {
           ).some(el => el.value && el.value.trim() !== ''));
           window.LESSON_DATA = transformed;
           if (window.LessonGenericRenderer) window.LessonGenericRenderer.initialize(response);
+          phase3LessonLoadError = false;
           isSheetSynced = true;
           if (!hasTypedAnswer) renderCurrentLevelDOM(currentLevel);
           else console.info('Lesson data updated for next level navigation; active inputs preserved.');
         } catch (e) {
-          console.error('Phase2 adapter rejected lesson data; legacy cards preserved:', e);
+          phase3LessonLoadError = true;
+          renderCurrentLevelDOM(currentLevel);
+          console.error('Phase2 adapter rejected lesson data:', e);
         }
       } else {
-        console.warn('Structured API unavailable; legacy lesson remains in use:', response);
+        phase3LessonLoadError = true;
+        renderCurrentLevelDOM(currentLevel);
+        console.warn('Structured API unavailable:', response);
       }
     })
     .withFailureHandler(function(error) {
       phase2Loading = false;
-      console.warn('Structured Sheets API failed; legacy lesson remains in use:', error);
+      phase3LessonLoadError = true;
+      renderCurrentLevelDOM(currentLevel);
+      console.warn('Structured Sheets API failed:', error);
     })
     .getLessonData(window.ACTIVE_LESSON_ID || 'MATH_B020');
 }
