@@ -235,7 +235,14 @@ function renderCurrentLevelDOM(level) {
   if (!container) return;
 
   let htmlContent = '';
-  if (level === 1 && typeof getHTML_LV1 === 'function') htmlContent = getHTML_LV1();
+  if ((window.ACTIVE_LESSON_ID || 'MATH_B020') !== 'MATH_B020' &&
+      !(window.LessonGenericRenderer && window.LessonGenericRenderer.isActive())) {
+    htmlContent = '<div role="status" class="p-8 text-center font-bold text-amber-900">'+
+      (phase3LessonLoadError ? 'Không thể tải bài học từ Google Sheets. Vui lòng thử lại hoặc báo người quản lý.' :
+      'Đang tải dữ liệu bài học từ Google Sheets...')+'</div>';
+  }
+  else if (window.LessonGenericRenderer && window.LessonGenericRenderer.isActive()) htmlContent = window.LessonGenericRenderer.render(level);
+  else if (level === 1 && typeof getHTML_LV1 === 'function') htmlContent = getHTML_LV1();
   else if (level === 2 && typeof getHTML_LV2 === 'function') htmlContent = getHTML_LV2();
   else if (level === 3 && typeof getHTML_LV3 === 'function') htmlContent = getHTML_LV3();
 
@@ -245,29 +252,61 @@ function renderCurrentLevelDOM(level) {
     const inputClass = document.getElementById(`header-class-lv${level}`);
     if (inputName) inputName.value = currentUser.name || '';
     if (inputClass) inputClass.value = currentUser.class || '';
+    if (window.LessonAdapter && typeof window.LessonAdapter.bindStableIds === 'function') {
+      window.LessonAdapter.bindStableIds(container, level, currentUser);
+    }
     bindAndRestoreLevelState(level);
+    if(window.KidInteractions)window.KidInteractions.activate(container);
   }
 }
 
+// DEVELOPMENT ONLY: phase 2 structured data integration on non-production branch.
+const PHASE2_SHEETS_ADAPTER = true;
+let phase2Loading = false;
+let phase3LessonLoadError = false;
 function loadLessonDataFromGAS(level) {
-  // 1. Vẽ ngay lập tức giao diện để bé không phải chờ
   renderCurrentLevelDOM(level);
-
-  // 2. Nếu chưa đồng bộ từ Google Sheets trong phiên này thì gọi ngầm lên Code.gs
-  if (!isSheetSynced && typeof google !== 'undefined' && google.script && google.script.run) {
-    google.script.run
-      .withSuccessHandler(function(response) {
-        isSheetSynced = true;
-        if (response && (response.status === 'success' || response.data)) {
-          mergeSheetsData(response);
+  if (isSheetSynced || phase2Loading || typeof google === 'undefined' ||
+      !google.script || !google.script.run) return;
+  phase2Loading = true;
+  google.script.run
+    .withSuccessHandler(function(response) {
+      phase2Loading = false;
+      if (PHASE2_SHEETS_ADAPTER && response && response.status === 'success') {
+        try {
+          const targetLessonId = window.ACTIVE_LESSON_ID || 'MATH_B020';
+          const transformed = targetLessonId === 'MATH_B020'
+            ? window.LessonAdapter.apply(response, window.LESSON_DATA)
+            : window.LESSON_DATA;
+          // Never discard answers currently typed while a remote fetch was in flight.
+          const container = document.getElementById('lesson-dynamic-container');
+          const hasTypedAnswer = !!(container && Array.from(
+            container.querySelectorAll('.lvl-input, .carry-input')
+          ).some(el => el.value && el.value.trim() !== ''));
+          window.LESSON_DATA = transformed;
+          if (window.LessonGenericRenderer) window.LessonGenericRenderer.initialize(response);
+          phase3LessonLoadError = false;
+          isSheetSynced = true;
+          if (!hasTypedAnswer) renderCurrentLevelDOM(currentLevel);
+          else console.info('Lesson data updated for next level navigation; active inputs preserved.');
+        } catch (e) {
+          phase3LessonLoadError = true;
           renderCurrentLevelDOM(currentLevel);
+          console.error('Phase2 adapter rejected lesson data:', e);
         }
-      })
-      .withFailureHandler(function(err) {
-        console.warn("Sử dụng dữ liệu tích hợp:", err);
-      })
-      .getLessonData();
-  }
+      } else {
+        phase3LessonLoadError = true;
+        renderCurrentLevelDOM(currentLevel);
+        console.warn('Structured API unavailable:', response);
+      }
+    })
+    .withFailureHandler(function(error) {
+      phase2Loading = false;
+      phase3LessonLoadError = true;
+      renderCurrentLevelDOM(currentLevel);
+      console.warn('Structured Sheets API failed:', error);
+    })
+    .getLessonData(window.ACTIVE_LESSON_ID || 'MATH_B020');
 }
 
 // 4. KHỞI CHẠY, LƯU NHÁP & ĐIỀU HƯỚNG Ô NHẬP
@@ -502,7 +541,8 @@ function handleContainerInput(e) {
   if (!target || (!target.classList.contains('lvl-input') && !target.classList.contains('carry-input'))) return;
   const tType = target.dataset.type;
 
-  if (tType === 'vert-digit' || tType === 'digit' || target.dataset.role === 'carry') {
+  if (tType === 'choice' || tType === 'match') { /* preserve explicit choice index */ }
+  else if (tType === 'vert-digit' || tType === 'digit' || target.dataset.role === 'carry') {
     target.value = target.value.replace(/[^0-9]/g, '').slice(-1);
   } else if (tType === 'wp-op') {
     target.value = target.value.replace(/＋/g, '+').replace(/–|—|−/g, '-').replace(/[^+\-]/g, '').slice(-1);
@@ -638,7 +678,7 @@ function evaluateScope(scopeElement) {
     const expected = input.dataset.ans;
     const rawVal = input.value.trim();
     if (rawVal === '') { emptyCount++; applyFeedbackStyle(input, 'empty'); return; }
-    const isCorrect = (inputType === 'vert-digit')
+    const isCorrect = (inputType === 'vert-digit' || inputType === 'choice' || inputType === 'match')
       ? (rawVal === expected)
       : (parseInt(rawVal.replace(/[^0-9]/g, ''), 10) === parseInt(expected.replace(/[^0-9]/g, ''), 10));
     if (isCorrect) { correctCount++; applyFeedbackStyle(input, 'correct'); }
@@ -783,13 +823,14 @@ function evaluateScope(scopeElement) {
   let newlyRewardedStars = 0;
   scopeElement.querySelectorAll('[data-prob-id]').forEach(probEl => {
     const probId = probEl.dataset.probId;
+    const rewardKey = probEl.closest('[data-reward-owner]')?.dataset.rewardOwner || probId;
     const reqInputs = Array.from(probEl.querySelectorAll('.lvl-input, .carry-input'));
     if (reqInputs.length === 0) return;
     if (reqInputs.every(inp => inp.dataset.lastStatus === 'correct')) {
       const badge = probEl.querySelector('.prob-star-badge');
       if (badge) badge.classList.remove('hidden');
-      if (!currentUser.rewardedItems[probId]) {
-        currentUser.rewardedItems[probId] = true;
+      if (!currentUser.rewardedItems[rewardKey]) {
+        currentUser.rewardedItems[rewardKey] = true;
         currentUser.stars += 2;
         newlyRewardedStars += 2;
       }
@@ -1081,6 +1122,7 @@ function randomizeSectionData(sectionId) {
 
 // Chạy xáo trộn, vẽ lại giao diện bài học mới
 function randomizeSection(sectionId) {
+  if (window.LessonGenericRenderer && window.LessonGenericRenderer.refreshRun(sectionId)) return;
   randomizeSectionData(sectionId);
   resetSection(sectionId);
   renderCurrentLevelDOM(currentLevel); // Vẽ lại HTML với dữ liệu mới
@@ -1097,6 +1139,7 @@ function randomizeSection(sectionId) {
 
 // Bấm nút Đổi Đề Mới cho toàn bộ phiếu
 function randomizeCurrentLevel() {
+  if (window.LessonGenericRenderer && window.LessonGenericRenderer.refreshLevel()) return;
   if (currentLevel === 1) {
     randomizeSectionData('lv1_ex1');
     randomizeSectionData('lv1_ex2');

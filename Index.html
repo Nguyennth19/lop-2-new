@@ -63,7 +63,7 @@
         <h1 class="text-3xl sm:text-4xl md:text-5xl font-baloo font-extrabold text-sky-950 leading-tight">
           Chào <span id="dash-greeting-name" class="text-rose-600">Bé</span>! 👋
         </h1>
-        <p class="text-sky-900 font-bold text-sm sm:text-base mt-2">
+        <p id="home-lesson-banner" class="text-sky-900 font-bold text-sm sm:text-base mt-2">
           Hôm nay chúng mình cùng chinh phục 3 cấp độ của Bài 20: Phép cộng (có nhớ) để tích lũy thật nhiều Sao vàng nhé!
         </p>
         <div class="mt-5 flex flex-wrap items-center justify-center md:justify-start gap-3">
@@ -116,14 +116,14 @@
           </div>
           <div class="flex-1">
             <span class="inline-block bg-rose-100 text-rose-700 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider mb-1">Tuần 10 • Toán Lớp 2</span>
-            <h2 class="text-xl sm:text-2xl font-baloo font-extrabold text-sky-900 leading-tight">
+            <h2 id="home-lesson-title" class="text-xl sm:text-2xl font-baloo font-extrabold text-sky-900 leading-tight">
               Bài 20: Phép cộng (có nhớ) số có hai chữ số với số có hai chữ số
             </h2>
           </div>
         </div>
 
         <div class="mt-5 space-y-2.5">
-          <div class="text-sm font-bold text-slate-600">Tiến độ chinh phục 3 cấp độ (51 câu • Mỗi câu đúng +2 ⭐):</div>
+          <div id="home-lesson-progress" class="text-sm font-bold text-slate-600">Tiến độ chinh phục 3 cấp độ (51 câu • Mỗi câu đúng +2 ⭐):</div>
           <div class="grid grid-cols-3 gap-2">
             <button onclick="startLesson(1)" id="badge-lv1" class="bg-slate-100 border-2 border-slate-200 text-slate-500 rounded-xl py-2.5 text-center font-baloo font-extrabold text-xs sm:text-sm transition cursor-pointer hover:border-pink-400">
               LV1 • Căn bản <span class="hidden" id="icon-lv1">⭐</span>
@@ -352,7 +352,25 @@
   <!-- Nạp đủ cả 3 tệp Script theo đúng thứ tự: Render -> UI -> Logic -->
   <?!= include('Script_Render'); ?>
   <?!= include('Script_UI'); ?>
+  <script>window.ACTIVE_LESSON_ID = <?!= activeLessonIdJson ?>;</script>
+  <?!= include('Script_LessonAdapter'); ?>
+  <?!= include('Script_Interactions'); ?>
+  <?!= include('Script_GenericRenderer'); ?>
   <?!= include('Script_Logic'); ?>
+  <?!= include('Script_Phase3QA'); ?>
+  <script>
+    (function(){
+      if(window.ACTIVE_LESSON_ID!=='MATH_B021')return;
+      var banner=document.getElementById('home-lesson-banner');
+      var title=document.getElementById('home-lesson-title');
+      var progress=document.getElementById('home-lesson-progress');
+      if(banner)banner.textContent='Hôm nay bé khám phá Bài 21: Luyện tập chung với phép cộng có nhớ, hình minh họa và trò chơi tương tác!';
+      if(title)title.textContent='Bài 21: Luyện tập chung — Tương tác vui với Toán';
+      if(progress)progress.textContent='Hai cấp độ đã có học liệu (15 câu • Mỗi câu đúng +2 ⭐). LV3 đang được xây dựng.';
+      var lv3=document.getElementById('badge-lv3');
+      if(lv3){lv3.disabled=true;lv3.title='LV3 chưa có học liệu đã kiểm duyệt';lv3.classList.add('opacity-50','cursor-not-allowed');}
+    })();
+  </script>
 
 </body>
 </html>
