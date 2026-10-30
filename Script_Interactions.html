@@ -1,0 +1,70 @@
+<script>
+/* Touch-first interactive question types; selection always has an accessible button alternative.
+   Answer lives in a standard .lvl-input so production grading and draft restore remain compatible. */
+window.KidInteractions=(function(){
+  const esc=s=>window.LessonAdapter.safe(String(s));
+  function choice(q,id,p){
+    const options=p.options||[];
+    return '<div data-prob-id="'+esc(id)+'" class="rounded-3xl bg-white border-2 border-sky-200 p-4 space-y-3">'+
+      '<div class="text-lg font-bold text-sky-900">'+esc(p.prompt)+'</div>'+
+      (p.visual?'<div class="text-center text-4xl" aria-hidden="true">'+esc(p.visual)+'</div>':'')+
+      '<div class="flex flex-wrap gap-3" role="group" aria-label="Chọn đáp án">'+
+      options.map((opt,i)=>'<button type="button" data-kid-select="'+esc(i)+'" class="kid-option px-5 py-3 rounded-2xl bg-sky-50 border-2 border-sky-300 font-bold" aria-pressed="false">'+esc(opt)+'</button>').join('')+'</div>'+
+      '<input class="lvl-input kid-value w-20 p-2 border rounded-xl bg-white" readonly aria-label="Đáp án đã chọn" data-type="choice" data-ans="'+esc(p.correctIndex)+'" value="" placeholder="Chưa chọn">'+
+      '<span class="prob-star-badge hidden">+2 ⭐</span></div>';
+  }
+  function match(q,id,p){
+    const options=p.options||[],pairs=p.pairs||[];
+    return '<div data-prob-id="'+esc(id)+'" class="rounded-3xl bg-indigo-50 border-2 border-indigo-200 p-4 space-y-3">'+
+      '<h4 class="font-bold text-indigo-900">'+esc(p.prompt)+'</h4>'+
+      '<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">'+
+      pairs.map((pair,i)=>'<div class="p-3 bg-white rounded-2xl border border-indigo-200">'+
+        '<div class="font-bold mb-2">'+esc(pair.left)+'</div>'+
+        '<select aria-label="Ghép với '+esc(pair.left)+'" data-kid-match="'+esc(i)+'" class="lvl-input w-full rounded-xl border-2 border-indigo-300 p-3" data-type="match" data-ans="'+esc(pair.rightIndex)+'">'+
+        '<option value="">Chọn ô để nối</option>'+options.map((o,j)=>'<option value="'+j+'">'+esc(o)+'</option>').join('')+
+        '</select></div>').join('')+'</div><span class="prob-star-badge hidden">+2 ⭐</span></div>';
+  }
+  function drag(q,id,p){
+    const tokens=p.tokens||[];
+    return '<div data-prob-id="'+esc(id)+'" class="rounded-3xl bg-amber-50 border-2 border-amber-300 p-4 space-y-3">'+
+      '<h4 class="font-bold text-amber-900">'+esc(p.prompt)+'</h4>'+
+      '<div class="flex flex-wrap gap-3">'+tokens.map((t,i)=>
+      '<button type="button" draggable="true" data-kid-token="'+esc(i)+'" class="px-4 py-3 bg-white rounded-2xl border-2 border-amber-400 font-bold" aria-label="Chọn thẻ '+esc(t)+'">'+esc(t)+'</button>').join('')+'</div>'+
+      '<div data-kid-drop class="rounded-2xl bg-white border-2 border-dashed border-sky-400 p-5 text-center font-bold" tabindex="0" role="button" aria-label="Ô thả đáp án; có thể chạm thẻ bên trên">Thả hoặc chọn thẻ vào đây</div>'+
+      '<input class="lvl-input kid-value w-20 p-2 rounded-xl border bg-white" readonly data-type="choice" data-ans="'+esc(p.correctIndex)+'" aria-label="Thẻ đã chọn" placeholder="Chưa chọn">'+
+      '<span class="prob-star-badge hidden">+2 ⭐</span></div>';
+  }
+  function activate(root){
+    if(!root || root.dataset.kidInteractionsBound)return;
+    root.dataset.kidInteractionsBound='1';
+    const choose=(el,index)=>{
+      const card=el.closest('[data-prob-id]'),input=card&&card.querySelector('.kid-value');
+      if(!input)return;
+      input.value=String(index);
+      card.querySelectorAll('[data-kid-select],[data-kid-token]').forEach(b=>b.setAttribute('aria-pressed',String(b===el)));
+      input.dispatchEvent(new Event('input',{bubbles:true}));
+      const drop=card.querySelector('[data-kid-drop]');
+      if(drop)drop.textContent=el.textContent;
+    };
+    root.addEventListener('click',e=>{
+      const b=e.target.closest('[data-kid-select],[data-kid-token]');
+      if(b&&root.contains(b))choose(b,b.dataset.kidSelect??b.dataset.kidToken);
+    });
+    root.addEventListener('dragstart',e=>{
+      const b=e.target.closest('[data-kid-token]');
+      if(b&&e.dataTransfer)e.dataTransfer.setData('text/plain',b.dataset.kidToken);
+    });
+    root.addEventListener('dragover',e=>{if(e.target.closest('[data-kid-drop]'))e.preventDefault();});
+    root.addEventListener('drop',e=>{
+      const drop=e.target.closest('[data-kid-drop]');
+      if(!drop)return;
+      e.preventDefault();
+      const idx=e.dataTransfer&&e.dataTransfer.getData('text/plain');
+      const token=drop.closest('[data-prob-id]').querySelector('[data-kid-token="'+idx+'"]');
+      if(token)choose(token,idx);
+    });
+  }
+  return {render:(q,id)=>q.question_type==='CHOICE'?choice(q,id,q.payload):
+    q.question_type==='MATCH_PAIRS'?match(q,id,q.payload):drag(q,id,q.payload),activate};
+})();
+</script>
