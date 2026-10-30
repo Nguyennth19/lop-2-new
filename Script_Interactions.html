@@ -43,17 +43,37 @@ window.KidInteractions=(function(){
       '<input class="lvl-input kid-value w-20 p-2 rounded-xl border bg-white" readonly data-type="choice" data-ans="'+esc(p.correctIndex)+'" aria-label="Thẻ đã chọn" placeholder="Chưa chọn">'+
       '<span class="prob-star-badge hidden">+2 ⭐</span></div>';
   }
+  function syncSelections(root){
+    root.querySelectorAll('[data-prob-id]').forEach(card=>{
+      const input=card.querySelector('.kid-value');
+      if(!input)return;
+      const buttons=card.querySelectorAll('[data-kid-select],[data-kid-token]');
+      buttons.forEach(btn=>{
+        const val=btn.dataset.kidSelect??btn.dataset.kidToken;
+        const selected=input.value!==''&&String(val)===String(input.value);
+        btn.setAttribute('aria-pressed',String(selected));
+        btn.classList.toggle('ring-4',selected);
+        btn.classList.toggle('ring-emerald-300',selected);
+        btn.classList.toggle('border-emerald-500',selected);
+      });
+      const drop=card.querySelector('[data-kid-drop]');
+      if(drop){
+        const selected=card.querySelector('[data-kid-token][aria-pressed="true"]');
+        drop.textContent=selected?selected.textContent:'Thả hoặc chọn thẻ vào đây';
+      }
+    });
+  }
   function activate(root){
-    if(!root || root.dataset.kidInteractionsBound)return;
+    if(!root)return;
+    // Restore both the input value and its visible selected state after reload.
+    if(root.dataset.kidInteractionsBound){syncSelections(root);return;}
     root.dataset.kidInteractionsBound='1';
     const choose=(el,index)=>{
       const card=el.closest('[data-prob-id]'),input=card&&card.querySelector('.kid-value');
       if(!input)return;
       input.value=String(index);
-      card.querySelectorAll('[data-kid-select],[data-kid-token]').forEach(b=>b.setAttribute('aria-pressed',String(b===el)));
+      syncSelections(card);
       input.dispatchEvent(new Event('input',{bubbles:true}));
-      const drop=card.querySelector('[data-kid-drop]');
-      if(drop)drop.textContent=el.textContent;
     };
     root.addEventListener('click',e=>{
       const b=e.target.closest('[data-kid-select],[data-kid-token]');
@@ -72,6 +92,7 @@ window.KidInteractions=(function(){
       const token=drop.closest('[data-prob-id]').querySelector('[data-kid-token="'+idx+'"]');
       if(token)choose(token,idx);
     });
+    syncSelections(root);
   }
   return {render:(q,id)=>q.question_type==='CHOICE'?choice(q,id,q.payload):
     q.question_type==='MATCH_PAIRS'?match(q,id,q.payload):drag(q,id,q.payload),activate};
