@@ -94,7 +94,9 @@ window.LessonGenericRenderer = (function () {
     throw Error('Unsupported type: '+q.question_type);
   }
   function renderCard(q,i){
-    const id=cardId(q),item=makeItem(q,i),type=q.question_type;
+    const id=cardId(q),type=q.question_type;
+    if(['CHOICE','MATCH_PAIRS','DRAG_TAP'].includes(type))return '<div data-reward-owner="'+esc(q.question_id)+'">'+window.KidInteractions.render(q,id)+'</div>';
+    const item=makeItem(q,i);
     const wrap=html=>'<div data-reward-owner="'+esc(q.question_id)+'">'+html+'</div>';
     if(type==='VERTICAL_ADD')return wrap(renderStandardVerticalCard(item,id));
     if(type==='MISSING_DIGIT')return wrap(renderVerticalPuzzleCard(item,id));
@@ -138,7 +140,7 @@ window.LessonGenericRenderer = (function () {
     response.sections.forEach(s=>{if(!s.section_id||sids.has(s.section_id))throw Error('Duplicate/missing section');sids.add(s.section_id);});
     response.questions.forEach(q=>{
       if(!q.question_id||qids.has(q.question_id)||!sids.has(q.section_id))throw Error('Invalid question link');
-      if(!['VERTICAL_ADD','MENTAL_ADD','WORD_PROBLEM','MISSING_DIGIT'].includes(q.question_type))throw Error('Unsupported question type');
+      if(!['VERTICAL_ADD','MENTAL_ADD','WORD_PROBLEM','MISSING_DIGIT','CHOICE','MATCH_PAIRS','DRAG_TAP'].includes(q.question_type))throw Error('Unsupported question type');
       qids.add(q.question_id);
     });
     apiData=clone(response);
