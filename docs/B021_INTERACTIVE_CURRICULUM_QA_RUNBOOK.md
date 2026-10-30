@@ -6,7 +6,7 @@
 - `CHOICE`: tap large answer; example longest flight path (bee 61 cm, dragonfly 63 cm, grasshopper 51 cm), and illustrative fish tanks.
 - `MATCH_PAIRS`: connect equations to outputs via three accessible select menus (45+6=51, 81+9=90, 26+66=92).
 - `DRAG_TAP`: drag a result token onto the zone, or tap the token on mobile; e.g. dragonfly route 39+24=63 cm.
-- Emojis are **new schematic illustrative placeholders**, **not original textbook pictures**. The tank numbers are adapted, not sourced verbatim.
+- The flight-path and fish-tank questions now render **original in-app SVG/CSS diagrams**, not copyrighted book images. Illustrative heights are adapted and need pedagogical review.
 - Existing scoring `evaluateScope`, reward ledger and input drafts support the new types; user browser verification is required.
 - New data `qa_status=ADAPTED_FROM_LESSON_FORMAT` and `curriculum_format_QA=PENDING_INTERACTIVE_QA` pending actual QA.
 
@@ -26,12 +26,12 @@ Columns: `lesson_id, rule_id, question_type, operation, min_addends, max_addends
 4. Run `testInteractivePayloadNegativeQA()`. Expect PASS, 4/4.
 5. Run `runCurriculumAuditQA()`. Expect PASS; inspect `CURRICULUM_AUDIT` on QA Google Sheet.
 6. For automatic on-edit audit, **optionally** run `installCurriculumAuditTriggerQA()` **once** in the QA project and authorize. Only allowed for the hardcoded isolated QA spreadsheet ID. Inspect Apps Script > Triggers to confirm. Edit an isolated B021 question; confirm new report timestamps in `CURRICULUM_AUDIT`. Remember that malicious/broken rows will block the API; undo bad QA edits.
-7. **Deploy a new QA Web App version**. Open `?lesson=MATH_B021`, enter LV1; run DevTools Console inside `userHtmlFrame`:
+7. **Deploy a new QA Web App version**. The homepage for `?lesson=MATH_B021` now reflects Bài 21 and marks unavailable LV3 as disabled. Open `?lesson=MATH_B021`, enter LV1; run DevTools Console inside `userHtmlFrame`:
    - `phase3B021VisualQA()`: expect **13/13** after adding choice, match, drag checks.
    - `phase3InteractiveDOMQA()`: expect **7/7** (correct/wrong/empty across 3 types).
    - `phase3GradeDOMQA()`: expect **9/9** (legacy grading).
    - `phase3FinalRegressionQA()`: expect **10/10** (legacy final regression).
-8. Test touch or mouse: tap MCQ options; connect match selects; drag a token or tap it; check star award once per question across re-grade and RUN; reload to verify state.
+8. Test touch or mouse: tap MCQ options; connect match selects; drag a token or tap it; check star award once per question across re-grade and RUN; reload to verify **visible selection highlight** and matching values.
 9. On LV3, expect no current content (no false placeholder questions).
 
 ## Source / user-experience references
