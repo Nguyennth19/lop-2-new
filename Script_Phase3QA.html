@@ -110,7 +110,7 @@ function phase3FinalRegressionQA() {
         htmls.every(h=>typeof h==='string'&&h.length>0));
       record('level-switch-does-not-change-run',
         JSON.stringify(currentUser.practiceRuns||{})===stateBefore);
-    }else record('generic-renderer-ready',false,'Open QA lesson LV1 and wait for API first');
+    }else record('generic-renderer-ready',false,'NOT_READY: Enter QA lesson LV1, wait until sections appear, then rerun');
     // Validate API errors without mutating global lesson data or calling backend.
     const bad={status:'success',lesson:{title:'QA'},sections:[{section_id:'X',level:1,
       title:'X',exercise_type:'MENTAL_ADD',sort_order:1}],
