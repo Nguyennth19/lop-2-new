@@ -392,3 +392,30 @@ function testInteractivePayloadNegativeQA() {
   var report={status:result.every(function(x){return x.pass;})?'PASS':'FAIL',cases:result};
   console.log('INTERACTIVE_NEGATIVE_QA '+JSON.stringify(report));return report;
 }
+
+/** Pure negative QA of CURRICULUM_RULES: never edits Sheets. */
+function testCurriculumRuleBoundaryQA() {
+  var ss=getSpreadsheetInstance(),sh=ss.getSheetByName('CURRICULUM_RULES');
+  if(!sh)throw Error('CURRICULUM_RULES not found');
+  var rows=sh.getDataRange().getValues(),header=rows.shift().map(String);
+  var rules=rows.filter(function(x){return x[0];}).map(function(v){var r={};header.forEach(function(h,i){r[h]=v[i];});return r;});
+  function q(id,type,p,answer){
+    return {question_id:id,question_type:type,payload_json:JSON.stringify(p),answer:answer};
+  }
+  var cases=[
+    {id:'B020_VALID',lesson:'MATH_B020',q:q('A','MENTAL_ADD',{n1:28,n2:45,op:'+',answer:73},73),accept:true},
+    {id:'B020_ONE_DIGIT',lesson:'MATH_B020',q:q('B','MENTAL_ADD',{n1:28,n2:5,op:'+',answer:33},33),accept:false},
+    {id:'B021_VALID_ONE_DIGIT',lesson:'MATH_B021',q:q('C','MENTAL_ADD',{n1:67,n2:3,op:'+',answer:70},70),accept:true},
+    {id:'B021_MINUS',lesson:'MATH_B021',q:q('D','MENTAL_ADD',{n1:67,n2:3,op:'-',answer:64},64),accept:false},
+    {id:'B021_THREE_TERMS',lesson:'MATH_B021',q:q('E','MENTAL_ADD',{n1:23,n2:38,terms:[23,38,5],op:'+',answer:66},66),accept:false},
+    {id:'B021_OUT_OF_SCOPE_SKILL',lesson:'MATH_B021',q:q('F','CHOICE',{prompt:'Chọn phép nhân',options:['2x3','3x2'],correctIndex:0,skill:'MULTIPLICATION'},0),accept:false},
+    {id:'B021_APPROVED_SKILL',lesson:'MATH_B021',q:q('G','CHOICE',{prompt:'So sánh độ dài',options:['A','B'],correctIndex:0,skill:'VISUAL_COMPARE_MEASURE'},0),accept:true}
+  ];
+  var results=cases.map(function(t){
+    var issues=validateCurriculumRules_({lesson_id:t.lesson},[t.q],rules);
+    return {test:t.id,pass:t.accept?issues.length===0:issues.length>0,issues:issues};
+  });
+  var status=results.every(function(x){return x.pass;})?'PASS':'FAIL';
+  console.log('CURRICULUM_BOUNDARY_QA '+JSON.stringify({status:status,results:results}));
+  return {status:status,results:results};
+}
