@@ -256,6 +256,7 @@ function renderCurrentLevelDOM(level) {
       window.LessonAdapter.bindStableIds(container, level, currentUser);
     }
     bindAndRestoreLevelState(level);
+    if(window.KidInteractions)window.KidInteractions.activate(container);
   }
 }
 
@@ -540,7 +541,8 @@ function handleContainerInput(e) {
   if (!target || (!target.classList.contains('lvl-input') && !target.classList.contains('carry-input'))) return;
   const tType = target.dataset.type;
 
-  if (tType === 'vert-digit' || tType === 'digit' || target.dataset.role === 'carry') {
+  if (tType === 'choice' || tType === 'match') { /* preserve explicit choice index */ }
+  else if (tType === 'vert-digit' || tType === 'digit' || target.dataset.role === 'carry') {
     target.value = target.value.replace(/[^0-9]/g, '').slice(-1);
   } else if (tType === 'wp-op') {
     target.value = target.value.replace(/＋/g, '+').replace(/–|—|−/g, '-').replace(/[^+\-]/g, '').slice(-1);
@@ -676,7 +678,7 @@ function evaluateScope(scopeElement) {
     const expected = input.dataset.ans;
     const rawVal = input.value.trim();
     if (rawVal === '') { emptyCount++; applyFeedbackStyle(input, 'empty'); return; }
-    const isCorrect = (inputType === 'vert-digit')
+    const isCorrect = (inputType === 'vert-digit' || inputType === 'choice' || inputType === 'match')
       ? (rawVal === expected)
       : (parseInt(rawVal.replace(/[^0-9]/g, ''), 10) === parseInt(expected.replace(/[^0-9]/g, ''), 10));
     if (isCorrect) { correctCount++; applyFeedbackStyle(input, 'correct'); }
