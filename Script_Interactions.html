@@ -44,7 +44,8 @@ window.KidInteractions=(function(){
       '<span class="prob-star-badge hidden">+2 ⭐</span></div>';
   }
   function syncSelections(root){
-    root.querySelectorAll('[data-prob-id]').forEach(card=>{
+    const cards=root.matches&&root.matches('[data-prob-id]')?[root]:Array.from(root.querySelectorAll('[data-prob-id]'));
+    cards.forEach(card=>{
       const input=card.querySelector('.kid-value');
       if(!input)return;
       const buttons=card.querySelectorAll('[data-kid-select],[data-kid-token]');
