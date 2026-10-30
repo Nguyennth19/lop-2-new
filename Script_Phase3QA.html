@@ -142,8 +142,8 @@ function phase3B021VisualQA() {
     'actual='+window.ACTIVE_LESSON_ID);
   check('renderer-initialized',!!engine&&engine.isActive());
   if(engine&&engine.isActive()){
-    check('eleven-questions',engine.questionCount()===11,'count='+engine.questionCount());
-    const expected=[6,5,0];
+    check('fifteen-questions',engine.questionCount()===15,'count='+engine.questionCount());
+    const expected=[8,7,0];
     [1,2,3].forEach((level,i)=>{
       const html=engine.render(level);
       const count=(html.match(/data-prob-id="/g)||[]).length;
@@ -154,11 +154,46 @@ function phase3B021VisualQA() {
     check('b21-mental-card',lv1.includes('41')&&lv1.includes('19'));
     check('b21-word-problem',lv2.includes('bác Thanh'));
     check('review-warning',lv1.includes('chờ đối chiếu SGK/SBT'));
+    check('interactive-choice',lv1.includes('data-kid-select'));
+    check('interactive-match',lv2.includes('data-kid-match'));
+    check('interactive-drag',lv2.includes('data-kid-drop'));
   }
   const report={status:results.every(r=>r.pass)?'PASS':'FAIL',
     passed:results.filter(r=>r.pass).length,total:results.length,results};
   console.table(results);
   console.log('PHASE3_B021_VISUAL_QA '+JSON.stringify(report));
   return report;
+}
+
+function phase3InteractiveDOMQA() {
+  const backup=JSON.parse(JSON.stringify(currentUser)), results=[];
+  function verify(type,p,values,expected){
+    const q={question_id:'QA_INTERACTIVE_'+type,question_type:type,payload:p};
+    const node=document.createElement('div');
+    node.innerHTML='<div data-reward-owner="'+q.question_id+'">'+window.KidInteractions.render(q,q.question_id)+'</div>';
+    const inputs=Array.from(node.querySelectorAll('.lvl-input'));
+    inputs.forEach((x,i)=>x.value=values[i]===null?'':String(values[i]));
+    const r=evaluateScope(node);
+    results.push({caseId:type+'_'+values.join('_'),pass:r.correctCount===expected.correct&&
+      r.wrongCount===expected.wrong&&r.emptyCount===expected.empty,actual:r});
+  }
+  try{
+    const choice={prompt:'Chọn con vật có đường bay dài nhất',options:['Ong','Chuồn chuồn','Châu chấu'],correctIndex:1};
+    verify('CHOICE',choice,[1],{correct:1,wrong:0,empty:0});
+    verify('CHOICE',choice,[0],{correct:0,wrong:1,empty:0});
+    verify('CHOICE',choice,[null],{correct:0,wrong:0,empty:1});
+    const match={prompt:'Nối',options:['51','90','92'],pairs:[{left:'45+6',rightIndex:0},{left:'81+9',rightIndex:1},{left:'26+66',rightIndex:2}]};
+    verify('MATCH_PAIRS',match,[0,1,2],{correct:3,wrong:0,empty:0});
+    verify('MATCH_PAIRS',match,[0,2,null],{correct:1,wrong:1,empty:1});
+    const drag={prompt:'Chọn kết quả',tokens:['61','63','51'],correctIndex:1};
+    verify('DRAG_TAP',drag,[1],{correct:1,wrong:0,empty:0});
+    verify('DRAG_TAP',drag,[null],{correct:0,wrong:0,empty:1});
+  }finally{
+    Object.keys(currentUser).forEach(k=>delete currentUser[k]);
+    Object.assign(currentUser,backup);saveDataImmediate();
+  }
+  const report={status:results.every(x=>x.pass)?'PASS':'FAIL',
+    passed:results.filter(x=>x.pass).length,total:results.length,results};
+  console.table(results);console.log('PHASE3_INTERACTIVE_DOM_QA '+JSON.stringify(report));return report;
 }
 </script>
