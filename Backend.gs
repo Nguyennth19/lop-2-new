@@ -374,3 +374,21 @@ function runCurriculumAuditQA() {
   console.log('CURRICULUM_AUDIT_QA '+JSON.stringify({status:status,lessons:rows}));
   return {status:status,lessons:rows};
 }
+
+function testInteractivePayloadNegativeQA() {
+  var sections=[{section_id:'S',exercise_type:'CHOICE',level:1}],base=function(id,type,p,ans){
+    return {question_id:id,section_id:'S',question_type:type,answer:ans,payload_json:JSON.stringify(p)};
+  };
+  var cases=[
+    {id:'VALID_CHOICE',q:base('VALID_CHOICE','CHOICE',{prompt:'Chọn đường bay',options:['Ong','Chuồn chuồn'],correctIndex:1,skill:'COMPARE_ADDITION_LENGTH'},1),valid:true},
+    {id:'INVALID_CHOICE_INDEX',q:base('INVALID_CHOICE_INDEX','CHOICE',{prompt:'Chọn',options:['A','B'],correctIndex:5,skill:'COMPARE_ADDITION_LENGTH'},5),valid:false},
+    {id:'INVALID_MATCH_PAIR',q:base('INVALID_MATCH_PAIR','MATCH_PAIRS',{prompt:'Nối',options:['51','90'],pairs:[{left:'45+6',rightIndex:3},{left:'81+9',rightIndex:1}],skill:'PAIR_ADDITION'},0),valid:false},
+    {id:'INVALID_DRAG_TOKENS',q:base('INVALID_DRAG_TOKENS','DRAG_TAP',{prompt:'Kéo',tokens:['61'],correctIndex:0,skill:'DRAG_ADDITION_LENGTH'},0),valid:false}
+  ];
+  var result=cases.map(function(t){
+    var issues=validateLessonRecords_({lesson_id:'MATH_B021'},sections,[t.q]);
+    return {caseId:t.id,pass:t.valid?issues.length===0:issues.length>0,issues:issues};
+  });
+  var report={status:result.every(function(x){return x.pass;})?'PASS':'FAIL',cases:result};
+  console.log('INTERACTIVE_NEGATIVE_QA '+JSON.stringify(report));return report;
+}
