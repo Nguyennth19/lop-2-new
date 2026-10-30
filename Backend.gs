@@ -172,6 +172,21 @@ function validateLessonRecords_(lesson, sections, questions) {
         var a=Number(p.n1), b=Number(p.n2), expected=p.op==='+'?a+b:p.op==='-'?a-b:NaN;
         if (!Number.isFinite(expected) || expected!==Number(p.answer)) errors.push('QUESTION '+q.question_id+': WRONG_ANSWER');
       }
+      // B021: review of carrying addition in 100; unlike B020, a one-digit addend is allowed.
+      if (lesson.lesson_id === 'MATH_B021') {
+        if (['VERTICAL_ADD','MENTAL_ADD','WORD_PROBLEM'].indexOf(q.question_type) !== -1) {
+          var n21a=Number(p.n1),n21b=Number(p.n2);
+          if (p.op !== '+' || Array.isArray(p.terms) || !Number.isInteger(n21a) ||
+              !Number.isInteger(n21b) || n21a < 1 || n21b < 1 ||
+              n21a > 99 || n21b > 99 || Math.max(n21a,n21b) < 10 ||
+              n21a % 10 + n21b % 10 < 10 || n21a + n21b > 100 ||
+              n21a + n21b !== Number(q.answer)) {
+            errors.push('QUESTION '+q.question_id+': B021_CURRICULUM_FORMAT_MISMATCH');
+          }
+        } else if (['MISSING_DIGIT','VISUAL_COMPARE','VISUAL_NUMBER'].indexOf(q.question_type) === -1) {
+          errors.push('QUESTION '+q.question_id+': B021_UNSUPPORTED_FORMAT');
+        }
+      }
       // B020 curriculum gate: exactly two two-digit addends with carrying, result <= 99.
       if (lesson.lesson_id === 'MATH_B020') {
         var n1, n2;
@@ -219,4 +234,37 @@ function getLessonCatalog() {
       .filter(function(o){return !!o.lesson_id;});
     return {status:'success',lessons:lessons};
   } catch(e) {return {status:'error',code:'CATALOG_READ_FAILED',message:String(e)};}
+}
+
+/** Server-only deep QA: no changes to data, student history, or stars. */
+function testPhase3CurriculumQA() {
+  var report={checkedAt:new Date().toISOString(),lessons:[],status:'PASS'};
+  ['MATH_B020','MATH_B021'].forEach(function(id){
+    var a=getLessonData(id);
+    var row={lessonId:id,status:a.status,sections:a.sections?a.sections.length:0,
+      questions:a.questions?a.questions.length:0,errors:a.errors||[],code:a.code||''};
+    if(a.status!=='success')report.status='FAIL';
+    report.lessons.push(row);
+  });
+  console.log('PHASE3_CURRICULUM_QA '+JSON.stringify(report));
+  return report;
+}
+function testPhase3NegativeCases() {
+  var cases=[
+    {id:'B021_INVALID_MINUS',type:'MENTAL_ADD',p:{n1:41,n2:19,op:'-',answer:22},ans:22},
+    {id:'B021_INVALID_THREE',type:'MENTAL_ADD',p:{n1:41,n2:19,op:'+',terms:[41,19,5],answer:65},ans:65},
+    {id:'B021_INVALID_NO_CARRY',type:'MENTAL_ADD',p:{n1:41,n2:12,op:'+',answer:53},ans:53},
+    {id:'B021_VALID_ONE_DIGIT',type:'MENTAL_ADD',p:{n1:67,n2:3,op:'+',answer:70},ans:70}
+  ];
+  var report=cases.map(function(t){
+    var q={question_id:t.id,section_id:'QA_S',question_type:t.type,
+      answer:t.ans,payload_json:JSON.stringify(t.p)};
+    var issues=validateLessonRecords_({lesson_id:'MATH_B021'},
+      [{section_id:'QA_S',exercise_type:'MENTAL_ADD',level:1}], [q]);
+    var shouldPass=t.id==='B021_VALID_ONE_DIGIT';
+    return {caseId:t.id,passed:shouldPass?issues.length===0:
+      issues.some(function(x){return x.indexOf('B021_CURRICULUM_FORMAT_MISMATCH')!==-1;}),issues:issues};
+  });
+  console.log('PHASE3_NEGATIVE_CASES '+JSON.stringify(report));
+  return {status:report.every(function(x){return x.passed;})?'PASS':'FAIL',cases:report};
 }
