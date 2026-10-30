@@ -133,4 +133,32 @@ function phase3FinalRegressionQA() {
   console.log('PHASE3_FINAL_REGRESSION_RESULT',JSON.stringify(report));
   return report;
 }
+
+/** Read-only QA of the currently loaded real B021 lesson. */
+function phase3B021VisualQA() {
+  const results=[], check=(name,ok,detail)=>results.push({name,pass:!!ok,detail:detail||''});
+  const engine=window.LessonGenericRenderer;
+  check('correct-lesson-id',window.ACTIVE_LESSON_ID==='MATH_B021',
+    'actual='+window.ACTIVE_LESSON_ID);
+  check('renderer-initialized',!!engine&&engine.isActive());
+  if(engine&&engine.isActive()){
+    check('eleven-questions',engine.questionCount()===11,'count='+engine.questionCount());
+    const expected=[6,5,0];
+    [1,2,3].forEach((level,i)=>{
+      const html=engine.render(level);
+      const count=(html.match(/data-prob-id="/g)||[]).length;
+      check('lv'+level+'-count',count===expected[i],'actual='+count+', expected='+expected[i]);
+    });
+    const lv1=engine.render(1),lv2=engine.render(2);
+    check('b21-vertical-card',lv1.includes('std-vertical-card'));
+    check('b21-mental-card',lv1.includes('41')&&lv1.includes('19'));
+    check('b21-word-problem',lv2.includes('bác Thanh'));
+    check('review-warning',lv1.includes('chờ đối chiếu SGK/SBT'));
+  }
+  const report={status:results.every(r=>r.pass)?'PASS':'FAIL',
+    passed:results.filter(r=>r.pass).length,total:results.length,results};
+  console.table(results);
+  console.log('PHASE3_B021_VISUAL_QA '+JSON.stringify(report));
+  return report;
+}
 </script>
