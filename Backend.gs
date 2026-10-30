@@ -329,3 +329,48 @@ function testCurriculumRulesTable() {
   var report={status:a.every(function(x){return x.status==='success';})?'PASS':'FAIL',rules:rules.length,lessons:a};
   console.log('CURRICULUM_RULES_TABLE_QA '+JSON.stringify(report));return report;
 }
+
+/** Opt-in QA-only installable trigger. Never installs against production Sheets. */
+function installCurriculumAuditTriggerQA() {
+  var id=PropertiesService.getScriptProperties().getProperty('PHASE3_QA_SPREADSHEET_ID');
+  if(id!=='10FrW5-R_dnK-ti_u4y2y5he_Ggst6NvjS_CDsg_i6ds')
+    throw Error('QA_ONLY: Wrong or missing isolated spreadsheet ID');
+  var exists=ScriptApp.getProjectTriggers().some(function(t){
+    return t.getHandlerFunction()==='curriculumAuditOnEdit';
+  });
+  if(!exists)ScriptApp.newTrigger('curriculumAuditOnEdit').forSpreadsheet(id).onEdit().create();
+  console.log('QA CURRICULUM AUDIT TRIGGER INSTALLED or ALREADY PRESENT');
+  return {status:'PASS',alreadyInstalled:exists};
+}
+/** Every edited row remains editable; API will reject invalid records, audit shows reasons. */
+function curriculumAuditOnEdit(e) {
+  if(!e || !e.range || !e.source)return;
+  var qaId=PropertiesService.getScriptProperties().getProperty('PHASE3_QA_SPREADSHEET_ID');
+  if(qaId!=='10FrW5-R_dnK-ti_u4y2y5he_Ggst6NvjS_CDsg_i6ds' || e.source.getId()!==qaId)return;
+  var name=e.range.getSheet().getName();
+  if(['QUESTIONS','CURRICULUM_RULES','SECTIONS'].indexOf(name)===-1)return;
+  var lock=LockService.getScriptLock();
+  if(!lock.tryLock(5000))return;
+  try{runCurriculumAuditQA();}finally{lock.releaseLock();}
+}
+function runCurriculumAuditQA() {
+  var qaId=PropertiesService.getScriptProperties().getProperty('PHASE3_QA_SPREADSHEET_ID');
+  if(qaId!=='10FrW5-R_dnK-ti_u4y2y5he_Ggst6NvjS_CDsg_i6ds')
+    throw Error('QA_ONLY: wrong spreadsheet');
+  var ss=SpreadsheetApp.openById(qaId),sheet=ss.getSheetByName('CURRICULUM_AUDIT');
+  if(!sheet)throw Error('Missing CURRICULUM_AUDIT sheet');
+  var now=new Date().toISOString(),ids=['MATH_B020','MATH_B021'],rows=[];
+  ids.forEach(function(id){
+    var api=getLessonData(id),errors=api.errors||[];
+    rows.push([now,id,api.status==='success'?'PASS':'FAIL',
+      api.sections?api.sections.length:0,api.questions?api.questions.length:0,
+      api.code||'',errors.join(' | '),'This is a lesson-scope audit; see API for per-question errors']);
+  });
+  sheet.getRange(1,1,1,8).setValues([['checked_at','lesson_id','status','section_count',
+    'question_count','api_code','errors','note']]);
+  sheet.getRange(2,1,rows.length,8).setValues(rows);
+  sheet.getRange(1,1,1,8).setFontWeight('bold');
+  var status=rows.every(function(r){return r[2]==='PASS';})?'PASS':'FAIL';
+  console.log('CURRICULUM_AUDIT_QA '+JSON.stringify({status:status,lessons:rows}));
+  return {status:status,lessons:rows};
+}
