@@ -121,7 +121,7 @@ function getLessonData(lessonId) {
   if (!/^[A-Z0-9_]{3,64}$/.test(id)) return { status: 'error', code: 'INVALID_LESSON_ID' };
   try {
     var ss = getSpreadsheetInstance();
-    var required = ['LESSONS', 'SECTIONS', 'QUESTIONS', 'CONTENT', 'SOURCES', 'ASSETS'];
+    var required = ['LESSONS', 'SECTIONS', 'QUESTIONS', 'CONTENT', 'SOURCES', 'ASSETS', 'CURRICULUM_RULES'];
     var tables = {};
     required.forEach(function(name) {
       var sheet = ss.getSheetByName(name);
@@ -139,6 +139,7 @@ function getLessonData(lessonId) {
     var questions = tables.QUESTIONS.filter(function(q) { return !!sectionIds[q.section_id]; });
     var content = tables.CONTENT.filter(function(c) { return c.lesson_id === id; });
     var errors = validateLessonRecords_(lesson, sections, questions);
+    errors = errors.concat(validateCurriculumRules_(lesson, questions, tables.CURRICULUM_RULES));
     if (errors.length) return { status: 'error', code: 'VALIDATION_FAILED', errors: errors, lessonId: id };
     questions.forEach(function(q) {
       if (q.payload_json) { q.payload = JSON.parse(q.payload_json); }
@@ -283,4 +284,48 @@ function testPhase3NegativeCases() {
   });
   console.log('PHASE3_NEGATIVE_CASES '+JSON.stringify(report));
   return {status:report.every(function(x){return x.passed;})?'PASS':'FAIL',cases:report};
+}
+
+/** Sheet-driven rule gate. Rule changes in CURRICULUM_RULES become effective on next API call. */
+function validateCurriculumRules_(lesson, questions, allRules) {
+  var errors=[],rules=(allRules||[]).filter(function(r){return r.lesson_id===lesson.lesson_id&&r.status==='ACTIVE';});
+  if (!rules.length){errors.push('CURRICULUM_RULES_MISSING: '+lesson.lesson_id);return errors;}
+  questions.forEach(function(q){
+    var rule=rules.filter(function(r){return String(r.question_type).split(',').indexOf(q.question_type)!==-1;})[0];
+    if (!rule){errors.push(q.question_id+': TYPE_NOT_APPROVED_BY_RULES');return;}
+    var p;
+    try{p=JSON.parse(q.payload_json);}catch(e){errors.push(q.question_id+': INVALID_RULES_PAYLOAD');return;}
+    if (rule.allowed_skills && String(rule.allowed_skills).split(',').indexOf(p.skill)===-1)
+      errors.push(q.question_id+': SKILL_OUTSIDE_LESSON');
+    if(rule.operation){
+      var n1,n2;
+      if(p.rows){
+        var asNum=function(row){return Number(row.slice(0,2).map(function(c){return typeof c==='object'?c.ans:c;}).join(''));};
+        n1=asNum(p.rows[0]);n2=asNum(p.rows[1]);
+      }else{n1=Number(p.n1);n2=Number(p.n2);}
+      var minD=Number(rule.min_digits),maxD=Number(rule.max_digits);
+      var validDigit=function(n){return Number.isInteger(n)&&n>=Math.pow(10,minD-1)&&n<Math.pow(10,maxD);};
+      var expected=Number(p.rows?p.sum:p.answer);
+      if(p.op!==rule.operation||Array.isArray(p.terms)||Number(rule.min_addends)!==2||
+        Number(rule.max_addends)!==2||!validDigit(n1)||!validDigit(n2)||
+        (lesson.lesson_id==='MATH_B021'&&Math.max(n1,n2)<10)||
+        (String(rule.carry_required).toUpperCase()==='TRUE'&&n1%10+n2%10<10)||
+        n1+n2>Number(rule.max_result)||n1+n2!==expected||expected!==Number(q.answer)){
+        errors.push(q.question_id+': CURRICULUM_RULE_VIOLATION');
+      }
+    }
+  });
+  return errors;
+}
+function testCurriculumRulesTable() {
+  var ss=getSpreadsheetInstance(),sheet=ss.getSheetByName('CURRICULUM_RULES');
+  if(!sheet)throw Error('Missing CURRICULUM_RULES sheet');
+  var cells=sheet.getDataRange().getValues(),header=cells.shift().map(String);
+  var rules=cells.filter(function(r){return r[0];}).map(function(r){var o={};header.forEach(function(h,i){o[h]=r[i]});return o;});
+  var a=['MATH_B020','MATH_B021'].map(function(id){
+    var api=getLessonData(id);
+    return {id:id,status:api.status,questions:(api.questions||[]).length,errors:api.errors||[]};
+  });
+  var report={status:a.every(function(x){return x.status==='success';})?'PASS':'FAIL',rules:rules.length,lessons:a};
+  console.log('CURRICULUM_RULES_TABLE_QA '+JSON.stringify(report));return report;
 }
