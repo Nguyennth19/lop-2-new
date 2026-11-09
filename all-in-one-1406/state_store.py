@@ -29,6 +29,8 @@ class LocalObjects:
     def list(self,prefix):
         p=self.root/prefix
         return [str(x.relative_to(self.root)) for x in p.rglob('*') if x.is_file()] if p.exists() else []
+    def delete(self,key):
+        (self.root/key).unlink(missing_ok=True)
 
 class S3Objects:
     def __init__(self,bucket,prefix='',endpoint_url=None,client=None):
@@ -51,6 +53,8 @@ class S3Objects:
         args=dict(Bucket=self.bucket,Key=self._key(key),Body=data,ContentType='application/json' if key.endswith('.json') else 'application/octet-stream')
         if self.enforce_sse:args['ServerSideEncryption']='AES256'
         self.client.put_object(**args)
+    def delete(self,key):
+        self.client.delete_object(Bucket=self.bucket,Key=self._key(key))
     def list(self,prefix):
         result=[];token=None
         while True:
