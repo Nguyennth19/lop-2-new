@@ -1,0 +1,31 @@
+name: LOP2 All-in-One Runner CI
+on:
+  pull_request:
+    paths:
+      - 'all-in-one-1406/**'
+      - '.github/workflows/lop2-all-in-one-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test-runner:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Unit tests (no private book material)
+        run: python -m unittest discover -s all-in-one-1406/tests -v
+      - name: Safety boundary
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          root=Path('all-in-one-1406')
+          forbidden={'.pdf','.xlsx','.xls','.db','.sqlite3','.pem','.key'}
+          flagged=[str(p) for p in root.rglob('*') if p.is_file() and p.suffix.lower() in forbidden]
+          if flagged:
+              raise SystemExit('Sensitive/binary source files committed: '+str(flagged))
+          print('No sensitive source binaries in runner workspace')
+          PY
