@@ -86,3 +86,13 @@ Use `summary.json` stored in the runner temporary environment (numeric only). Th
 4. A canary with genuine pages produces inspectable drafts and appropriate exceptions without exposing book content publicly.
 5. Runtime adapter and genuine N9 browser QA integrated before any technical release approval; reviewer N10 stays human.
 6. Only then set `LOP2_ENABLE_FULL_RUN=YES` and manually dispatch `run-all`. Automatic continuation will then resume same campaign across segmented jobs.
+
+## Cloud configuration and canary gate (2026-11-10 update)
+
+See [`docs/SETUP_R2_GITHUB.md`](docs/SETUP_R2_GITHUB.md) for private bucket provisioning, protected GitHub secrets, exact input hashes and the three protected actions: `preflight`, `canary`, then `run-all`.
+
+- `cloud_gates.py --action probe` verifies external S3/R2 write **and** read **and** list **and** delete, without uploading proprietary content.
+- `model_probe.py` checks the configured OpenAI model can be retrieved with the account key. It does **not** prove model image inference; the canary does.
+- `canary` runs `SGK_B001_K1_E01` on its actual source PDF image and requires one read-back draft and a sealed gate tied to the source manifest hash, model, and immutable draft hash. A draft with N9/N10/N12 PASS is rejected by the gate; this is **not** an approval of the question.
+- `run-all` is guarded by both the verified S3 canary gate and `LOP2_ENABLE_FULL_RUN=YES`, in addition to the fixed source PDF fingerprints.
+- Real S3/R2 and OpenAI API are not connected by the assistant's account. Tests for S3 behavior so far used a mock S3 endpoint; no live external preflight or real-image API call has been performed as part of this change.
