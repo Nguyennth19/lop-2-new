@@ -1,0 +1,16 @@
+# Do not commit source material, book content, student data or credentials
+*.pdf
+*.xlsx
+*.xls
+*.csv
+*.db
+*.sqlite3
+*.sqlite3-*
+*.jsonl
+state/
+output/
+private/
+.env
+*.pem
+*.key
+__pycache__/
