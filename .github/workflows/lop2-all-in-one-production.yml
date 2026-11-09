@@ -5,7 +5,7 @@ on:
       mode:
         description: 'preflight only, or gated processing of all source candidates'
         type: choice
-        options: [preflight, run-all]
+        options: [preflight, canary, run-all]
         default: preflight
         required: true
       campaign:
@@ -20,7 +20,8 @@ on:
         required: true
 
 # This workflow requires merge to main, a protected environment, external private storage,
-# and explicit LOP2_ENABLE_FULL_RUN=YES. Do not run on PRs or source content on public logs.
+# and explicit LOP2_ENABLE_FULL_RUN=YES plus a prior successful live canary gate.
+# Do not run on PRs or source content on public logs.
 permissions:
   contents: read
   actions: write
@@ -44,7 +45,7 @@ jobs:
       LOP2_VISION_MODEL: ${{ vars.LOP2_VISION_MODEL }}
       LOP2_INPUT_DIR: ${{ runner.temp }}/lop2-private
       LOP2_CAMPAIGN: ${{ inputs.campaign }}
-      LOP2_ALLOW_RUN: ${{ (inputs.mode == 'run-all' && vars.LOP2_ENABLE_FULL_RUN == 'YES') && 'YES' || 'NO' }}
+      LOP2_ALLOW_RUN: ${{ (inputs.mode == 'canary' || (inputs.mode == 'run-all' && vars.LOP2_ENABLE_FULL_RUN == 'YES')) && 'YES' || 'NO' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -75,6 +76,32 @@ jobs:
             --pdf-root "$LOP2_INPUT_DIR" \
             --campaign "$LOP2_CAMPAIGN" --store s3 \
             --mode preflight --summary-file "$RUNNER_TEMP/preflight.json"
+      - name: Probe real S3-compatible storage (write/read/list/delete)
+        run: |
+          python all-in-one-1406/cloud_gates.py --campaign "$LOP2_CAMPAIGN" --action probe
+      - name: Check real model credentials without generating question content
+        run: python all-in-one-1406/model_probe.py
+      - name: Live canary - create one machine draft from a real locked source page
+        if: inputs.mode == 'canary'
+        run: |
+          python all-in-one-1406/runner.py \
+            --manifest "$LOP2_INPUT_DIR/SOURCE_1406.csv" \
+            --pdf-root "$LOP2_INPUT_DIR" --campaign "$LOP2_CAMPAIGN" \
+            --store s3 --mode run --only-source-id SGK_B001_K1_E01 \
+            --max-items 1 --max-seconds 900 --retry-exceptions \
+            --summary-file "$RUNNER_TEMP/lop2-canary.json"
+      - name: Seal canary gate after read-back of a real draft
+        if: inputs.mode == 'canary'
+        run: |
+          python all-in-one-1406/cloud_gates.py \
+            --campaign "$LOP2_CAMPAIGN" --action mark-canary \
+            --manifest "$LOP2_INPUT_DIR/SOURCE_1406.csv"
+      - name: Block full production until canary gate is verified in S3
+        if: inputs.mode == 'run-all'
+        run: |
+          python all-in-one-1406/cloud_gates.py \
+            --campaign "$LOP2_CAMPAIGN" --action check-canary \
+            --manifest "$LOP2_INPUT_DIR/SOURCE_1406.csv"
       - name: Process one resumable segment
         id: content
         if: inputs.mode == 'run-all'
