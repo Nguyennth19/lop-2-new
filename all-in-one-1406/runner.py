@@ -161,6 +161,7 @@ def main():
     p.add_argument('--expected-count',type=int,default=1406)
     p.add_argument('--expected-bqas',type=int,default=21)
     p.add_argument('--retry-exceptions',action='store_true')
+    p.add_argument('--only-source-id',help='Source ID for a gated live canary, not a manifest subset')
     p.add_argument('--summary-file',type=Path)
     a=p.parse_args()
     if a.max_items<1 or a.max_items>1406:raise ValueError('MAX_ITEMS_OUT_OF_RANGE')
@@ -172,8 +173,13 @@ def main():
     status=preflight(rows,source,store,enabled,sha256_file(a.manifest))
     if a.mode=='run':
         if os.getenv('LOP2_ALLOW_RUN')!='YES':raise ValueError('RUN_BLOCKED_LOP2_ALLOW_RUN_NOT_YES')
-        summary=run_pipeline(rows,source,store,VisionExtractor(model=model),a.max_items,a.max_seconds,a.retry_exceptions)
+        selected = rows
+        if a.only_source_id:
+            selected = [r for r in rows if r['source_id'] == a.only_source_id]
+            if len(selected) != 1: raise ValueError('CANARY_ID_NOT_IN_MANIFEST')
+        summary=run_pipeline(selected,source,store,VisionExtractor(model=model),a.max_items,a.max_seconds,a.retry_exceptions)
         status.update(summary)
+        if a.only_source_id: status['canary_selected'] = a.only_source_id
     if a.summary_file:
         a.summary_file.parent.mkdir(parents=True,exist_ok=True)
         a.summary_file.write_text(json.dumps(status,ensure_ascii=False,indent=2),encoding='utf-8')
