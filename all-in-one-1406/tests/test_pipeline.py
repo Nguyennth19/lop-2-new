@@ -121,6 +121,8 @@ class FakeS3:
         key=(kw['Bucket'],kw['Key'])
         if key not in self.data:raise ClientError({'Error':{'Code':'NoSuchKey','Message':'missing'}},'GetObject')
         return {'Body':io.BytesIO(self.data[key])}
+    def delete_object(self,**kw):
+        self.data.pop((kw['Bucket'],kw['Key']),None)
     def list_objects_v2(self,**kw):
         keys=[key for (bucket,key) in self.data if bucket==kw['Bucket'] and key.startswith(kw['Prefix'])]
         return {'Contents':[{'Key':key} for key in keys],'IsTruncated':False}
@@ -137,5 +139,54 @@ class ExternalCheckpointTests(unittest.TestCase):
         third=AuditStore(S3Objects('private-bucket','lop2',client=fake),'campaign1')
         self.assertEqual(third.summary()['by_status']['DRAFT_READY'],1)
         self.assertEqual(len(fake.data),3)  # immutable events (2) and record pointer (1) and same record update
+
+
+class CloudGateTests(unittest.TestCase):
+    def test_s3_roundtrip_exercises_read_write_list_delete(self):
+        from cloud_gates import connectivity_probe
+        fake = FakeS3()
+        obj = S3Objects('private-lop2','lop2',client=fake)
+        result = connectivity_probe(obj,'test-campaign')
+        self.assertEqual(result,{'remote_write':True,'remote_read':True,
+                                 'remote_list':True,'remote_delete':True})
+        self.assertFalse(fake.data)
+
+    def test_canary_draft_gate_pins_model_manifest_and_hash(self):
+        from cloud_gates import validate_canary, check_canary_gate
+        fake = FakeS3()
+        store = AuditStore(S3Objects('private-lop2','lop2',client=fake),'source-test')
+        sid = 'SGK_B001_K1_E01'
+        draft = {'source_id':sid,'student_slots':[{'slot_id':'a','proposed_answer':'5'}],
+                 'verbatim_prompt_candidate':'Tính 2 + 3',
+                 'evidence':{'pdf_sha256':'a'*64,'page_image_sha256':'b'*64,'crop_sha256':'c'*64},
+                 'release_allowed':False,'slot_count':1,
+                 'qa':{'extraction_method':'AI_VISION_DRAFT',
+                       'n9_engine_browser_pass':False,'n10_reviewer_signed':False,
+                       'n12_release_allowed':False}}
+        draft_key=store.save_draft(sid,draft)
+        store.commit(sid,'DRAFT_REVIEW_REQUIRED','DRAFT_SAVED',extra={'draft_key':draft_key})
+        out=validate_canary(store,sid,'e'*64,'vision-model')
+        self.assertTrue(out['canary_ready']); self.assertFalse(out['release_allowed'])
+        check_canary_gate(store,'e'*64,'vision-model')
+        with self.assertRaisesRegex(RuntimeError,'CANARY_GATE_SOURCE_OR_MODEL_MISMATCH'):
+            check_canary_gate(store,'e'*64,'other-model')
+        with self.assertRaisesRegex(RuntimeError,'CANARY_GATE_SOURCE_OR_MODEL_MISMATCH'):
+            check_canary_gate(store,'f'*64,'vision-model')
+        changed={**draft,'verbatim_prompt_candidate':'altered'}
+        changed_key=store.save_draft(sid,changed)
+        store.commit(sid,'DRAFT_REVIEW_REQUIRED','DRAFT_SAVED',extra={'draft_key':changed_key})
+        with self.assertRaisesRegex(RuntimeError,'CANARY_GATE_DRAFT_HASH_DRIFT'):
+            check_canary_gate(store,'e'*64,'vision-model')
+
+    def test_canary_refuses_unproven_or_unreleased_payload(self):
+        from cloud_gates import validate_canary
+        store=AuditStore(LocalObjects(tempfile.mkdtemp()),'canary-negative')
+        sid='SGK_B001_K1_E01'
+        with self.assertRaisesRegex(RuntimeError,'CANARY_NO_SOURCE_BASED_DRAFT'):
+            validate_canary(store,sid,'a'*64,'vision-model')
+        key=store.save_draft(sid,{'source_id':sid,'student_slots':[], 'release_allowed':False})
+        store.commit(sid,'DRAFT_READY','DRAFT_SAVED',extra={'draft_key':key})
+        with self.assertRaisesRegex(RuntimeError,'CANARY_INSUFFICIENT_DRAFT_EVIDENCE'):
+            validate_canary(store,sid,'a'*64,'vision-model')
 
 if __name__=='__main__':unittest.main()
