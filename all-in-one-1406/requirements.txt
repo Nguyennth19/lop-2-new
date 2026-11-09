@@ -1,1 +1,5 @@
-The requested file reference is not currently visible. Use files.search or files.list to rediscover the file, then retry with a returned ref_id or file_id.
+boto3>=1.34,<2
+PyMuPDF>=1.24,<2
+Pillow>=11,<13
+pydantic>=2.9,<3
+openai>=2.0,<3
