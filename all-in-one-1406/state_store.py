@@ -39,6 +39,7 @@ class S3Objects:
             import boto3
             client=boto3.client('s3',endpoint_url=endpoint_url or None)
         self.client=client
+        self.enforce_sse=not bool(endpoint_url)
     def _key(self,k):return '/'.join(p for p in (self.prefix,k.lstrip('/')) if p)
     def get(self,key):
         from botocore.exceptions import ClientError
@@ -47,7 +48,9 @@ class S3Objects:
             if exc.response['Error']['Code'] in ('NoSuchKey','404','NotFound'):return None
             raise
     def put(self,key,data):
-        self.client.put_object(Bucket=self.bucket,Key=self._key(key),Body=data,ContentType='application/json' if key.endswith('.json') else 'application/octet-stream',ServerSideEncryption='AES256')
+        args=dict(Bucket=self.bucket,Key=self._key(key),Body=data,ContentType='application/json' if key.endswith('.json') else 'application/octet-stream')
+        if self.enforce_sse:args['ServerSideEncryption']='AES256'
+        self.client.put_object(**args)
     def list(self,prefix):
         result=[];token=None
         while True:
