@@ -11,7 +11,7 @@ import os
 import sys
 import time
 from pathlib import Path
-from source_processor import SourceProcessor, SourceError, sha256_bytes
+from source_processor import SourceProcessor, SourceError, sha256_bytes, sha256_file
 from question_builder import VisionExtractor, ExerciseDraft, BuildError, make_question
 from state_store import AuditStore, LocalObjects, S3Objects, now
 from engine_adapter import candidate_engine_payload
@@ -128,14 +128,20 @@ def setup_store(kind,state_dir,campaign,bucket=None,prefix='',endpoint=None,s3_c
     else: objects=LocalObjects(state_dir)
     return AuditStore(objects,campaign)
 
-def preflight(rows,source,store,vision_enabled):
+def preflight(rows,source,store,vision_enabled,manifest_hash):
     if not vision_enabled: raise ValueError('OPENAI_API_KEY_OR_VISION_MODEL_NOT_CONFIGURED')
     locks=source.verify_all(True)
     # Live external read/write probe. No private page data or credentials are logged.
-    key=f'{store.root}/control/preflight.json'
-    payload=json.dumps({"at":now(),"schema":1}).encode()
-    store.objects.put(key,payload)
-    if store.objects.get(key)!=payload:raise RuntimeError('CHECKPOINT_REMOTE_READBACK_FAILED')
+    lock_key=f'{store.root}/control/manifest_lock.json'
+    lock={"schema":1,"manifest_sha256":manifest_hash,"source_count":len(rows),
+          "source_pdfs":{k:v['sha256'] for k,v in locks.items()}}
+    existing=store.objects.get(lock_key)
+    if existing is not None:
+        if json.loads(existing)!=lock:raise RuntimeError('CAMPAIGN_INPUT_FINGERPRINT_CONFLICT')
+    else:
+        store.objects.put(lock_key,json.dumps(lock,sort_keys=True).encode())
+    if json.loads(store.objects.get(lock_key))!=lock:
+        raise RuntimeError('CHECKPOINT_REMOTE_READBACK_FAILED')
     return {"ready":True,"source_rows":len(rows),"source_locks":len(locks),
             "bqa_count":len({r['bqa'] for r in rows}),"external_readback":True}
 
@@ -163,7 +169,7 @@ def main():
     store=setup_store(a.store,a.state_dir,a.campaign,a.s3_bucket,a.s3_prefix,a.s3_endpoint)
     model=os.getenv('LOP2_VISION_MODEL','')
     enabled=bool(os.getenv('OPENAI_API_KEY') and model)
-    status=preflight(rows,source,store,enabled)
+    status=preflight(rows,source,store,enabled,sha256_file(a.manifest))
     if a.mode=='run':
         if os.getenv('LOP2_ALLOW_RUN')!='YES':raise ValueError('RUN_BLOCKED_LOP2_ALLOW_RUN_NOT_YES')
         summary=run_pipeline(rows,source,store,VisionExtractor(model=model),a.max_items,a.max_seconds,a.retry_exceptions)
