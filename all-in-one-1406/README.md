@@ -8,7 +8,7 @@
 - `VisionExtractor`: sends original page image to an externally configured, vision-capable OpenAI API model using **Responses API Structured Outputs (Pydantic)**. Explicitly separates worked examples, proposed answers, student slots, source-ID mapping uncertainty. Prompt intentionally returns `found=false` if identification is not defensible.
 - `QuestionBuilder`: validates proposed question content, source geometry, distinct student slots, source-observed blanks, simple arithmetic self-checks; creates a **machine draft with immutable source evidence hashes and `release_allowed=false`**.
 - `AuditStore`: S3-compatible external object storage, **event-first append-only stage events**, per-record checkpoint, immutable image/crop/model-output/JSON draft objects. Supports AWS S3 and S3-compatible endpoints; full external connectivity requires owner-provided credentials and bucket. Local backend exists for tests.
-- `runner.py`: traverses all 1,406 records and 21 BQA under one campaign ID, resumes at the saved stage, avoids re-billing the model for successfully saved extractions, continues after isolated question exceptions, aborts instead of mass-failing data when credentials/quota/network infrastructure is unavailable.
+- `runner.py`: pins the per-campaign manifest SHA-256 and four PDF SHA-256 hashes to prevent silent input drift; traverses all 1,406 records and 21 BQA under one campaign ID, resumes at the saved stage, avoids re-billing the model for successfully saved extractions, continues after isolated question exceptions, aborts instead of mass-failing data when credentials/quota/network infrastructure is unavailable.
 - `download_inputs.py`: fetches the *private* `SOURCE_1406.csv` and four exact locked source PDF files from protected S3 to the ephemeral runner, independently verifies all PDF file hashes before processing.
 - Separate protected GitHub Actions `workflow_dispatch` workflow, preflight default, `run-all` **gated** by repository variable + protected environment, max 35 candidates per job, optional automatic continuation up to 50 segments, GitHub concurrency single-writer.
 
@@ -19,6 +19,8 @@ There is no independent textual source sign-off, guaranteed correct visual ID ma
 ## Why the private storage is mandatory
 
 **The repository is public.** Never commit SGK/VBT source PDFs, Working Master exports, page screenshots, student data, answer payloads, private derived data, or API tokens. Use a private S3 bucket (or Cloudflare R2 with compatible S3 endpoint) with encryption, versioning, minimal IAM access and retention policy. Github Actions artifacts are not the durable primary checkpoint.
+
+Baseline SOURCE_1406.csv snapshot SHA-256 (from previous ONE-SHOT V1.0 input): `20863df79b330b17921da4695d5023800d65915328081af811d8092a593a0f95`. Verify this before staging or intentionally start a new campaign for changed source snapshots.
 
 Upload these five private files to S3 prefix `<LOP2_S3_PREFIX>/inputs/`:
 
