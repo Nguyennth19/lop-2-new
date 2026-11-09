@@ -1,140 +1,177 @@
 #!/usr/bin/env python3
-"""LOP2 1406 manifest traversal with durable, fail-closed state.
+"""One invocation / 1406 candidates with durable source-first per-stage checkpoints.
 
-No OCR, canonical content generation, source sign-off or QA pass is asserted.
+This runner emits MACHINE DRAFTS and EXCEPTIONS, not N9/N10 PASS or release approvals.
 """
 from __future__ import annotations
 import argparse
 import csv
-import hashlib
 import json
 import os
-from pathlib import Path
-import sqlite3
 import sys
-from datetime import datetime, timezone
+import time
+from pathlib import Path
+from source_processor import SourceProcessor, SourceError, sha256_bytes
+from question_builder import VisionExtractor, ExerciseDraft, BuildError, make_question
+from state_store import AuditStore, LocalObjects, S3Objects, now
+from engine_adapter import candidate_engine_payload
 
-REQUIRED = ("source_id", "lesson_id", "owner_batch", "track", "volume", "pdf_page", "source_sha256")
-TERMINAL = {"SOURCE_PROCESSING_REQUIRED", "INPUT_EXCEPTION", "SOURCE_CONFLICT"}
+TERMINAL = {"DRAFT_READY", "DRAFT_REVIEW_REQUIRED", "EXCEPTION"}
+MANDATORY = {"source_id", "lesson_id", "bqa", "track", "volume", "page", "source_sha256"}
 
-def utc_now():
-    return datetime.now(timezone.utc).isoformat()
+class InterruptedByTest(Exception):pass
 
-def digest(obj):
-    return hashlib.sha256(json.dumps(obj, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+def normalize_row(raw):
+    """Accept original V1 manifest columns without rewriting private source data."""
+    r={k:(v or '').strip() for k,v in raw.items() if k}
+    r['bqa']=r.get('bqa') or r.get('owner_batch','')
+    r['page']=r.get('page') or r.get('pdf_page','')
+    r['volume']=r.get('volume') or ('1' if r.get('source_file_id') in ('1Zfiw7VMZ_34cW1ZfaY3iuoRJLmaEuvfr','1YIWc2IJtyQQ-e5w6-Zrzwwik7-EEyqoW') else '2' if r.get('source_file_id') else '')
+    return r
 
-def connect(path: Path):
-    conn = sqlite3.connect(path)
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA synchronous=FULL")
-    conn.executescript("""
-    CREATE TABLE IF NOT EXISTS records(
-      source_id TEXT PRIMARY KEY, lesson_id TEXT, bqa TEXT,
-      input_hash TEXT NOT NULL, status TEXT NOT NULL, reason TEXT NOT NULL,
-      source_page TEXT, updated_at TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS events(
-      event_id INTEGER PRIMARY KEY AUTOINCREMENT,
-      source_id TEXT NOT NULL, at TEXT NOT NULL, event_type TEXT NOT NULL,
-      input_hash TEXT NOT NULL, status TEXT NOT NULL, reason TEXT NOT NULL
-    );
-    """)
-    return conn
+def load_manifest(path:Path,expected_count:int=1406,expected_bqas:int=21):
+    with path.open('r',encoding='utf-8-sig',newline='') as f: rows=[normalize_row(r) for r in csv.DictReader(f)]
+    if len(rows)!=expected_count: raise ValueError(f'MANIFEST_COUNT_MISMATCH:{len(rows)}!={expected_count}')
+    ids=[r.get('source_id','') for r in rows]
+    if len(set(ids))!=len(ids) or '' in ids: raise ValueError('MANIFEST_SOURCE_ID_DUPLICATE_OR_EMPTY')
+    bqas={r.get('bqa','') for r in rows}
+    if len(bqas)!=expected_bqas or '' in bqas: raise ValueError(f'MANIFEST_BQA_COUNT_MISMATCH:{len(bqas)}!={expected_bqas}')
+    for r in rows:
+        missing=MANDATORY-set(k for k,v in r.items() if v)
+        # Missing PDF page is a row-level exception, not global failure.
+        if missing-{'page'}: raise ValueError('MANIFEST_REQUIRED_FIELD_MISSING:'+r['source_id']+':'+','.join(sorted(missing)))
+    return sorted(rows,key=lambda r:(r['bqa'],r['lesson_id'],r['source_id']))
 
-def classify(row):
-    for field in REQUIRED:
-        if not str(row.get(field, "")).strip():
-            return "INPUT_EXCEPTION", "MISSING_" + field.upper()
-    page = str(row["pdf_page"]).strip()
-    if not page.isdigit() or int(page) < 1:
-        return "INPUT_EXCEPTION", "PDF_PAGE_INVALID"
-    if row["track"] not in ("SGK", "VBT"):
-        return "INPUT_EXCEPTION", "TRACK_INVALID"
-    if row["volume"] not in ("1", "2"):
-        return "INPUT_EXCEPTION", "VOLUME_INVALID"
-    if len(row["source_sha256"].strip()) != 64 or any(c not in "0123456789abcdefABCDEF" for c in row["source_sha256"].strip()):
-        return "INPUT_EXCEPTION", "SOURCE_SHA256_INVALID"
-    return "SOURCE_PROCESSING_REQUIRED", "EXACT_TEXT_SLOTS_ASSETS_VALIDATOR_RUNTIME_NOT_PROVEN"
+def classify_error(exc):
+    if isinstance(exc, (SourceError, BuildError)):return exc.code
+    if isinstance(exc, (TimeoutError, ConnectionError)):return 'TRANSIENT_NETWORK_OR_TIMEOUT'
+    message=str(exc).upper()
+    if 'RATE_LIMIT' in message or '429' in message:return 'VISION_RATE_LIMIT'
+    if 'INSUFFICIENT_QUOTA' in message:return 'VISION_QUOTA_EXCEEDED'
+    if 'AUTHENTICATION' in message or '401' in message:return 'VISION_AUTH_FAILED'
+    if 'VISION_DISABLED' in message:return 'VISION_NOT_CONFIGURED'
+    return 'UNEXPECTED_PROCESSING_ERROR'
 
-def append_event_jsonl(path: Path, event: dict):
-    with path.open("a", encoding="utf-8") as fp:
-        fp.write(json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n")
-        fp.flush()
-        os.fsync(fp.fileno())
+def run_pipeline(rows, source, store:AuditStore, extractor, max_items=35, max_seconds=15000,
+                 retry_exceptions=False, inject_interrupt_after=None):
+    started=time.monotonic(); processed=0; repeated=0; skipped=0; commits=0
+    for rec in rows:
+        if processed>=max_items or time.monotonic()-started>max_seconds:break
+        sid=rec['source_id']
+        current=store.load(sid)
+        if current and current['status'] in TERMINAL and not (retry_exceptions and current['status']=='EXCEPTION'):
+            skipped+=1; continue
+        if current and current['status']=='EXCEPTION' and retry_exceptions: current=None
+        processed+=1
+        try:
+            if current and current['stage'] in ('PAGE_LOCKED','VISION_EXTRACTED'):
+                image_key=current['extra'].get('image_key')
+                png=store.objects.get(image_key) if image_key else None
+                if not png: raise SourceError('PAGE_IMAGE_CHECKPOINT_MISSING')
+                evidence=current['extra']['evidence']
+                if sha256_bytes(png)!=evidence['image_sha256']:
+                    raise SourceError('PAGE_IMAGE_CHECKPOINT_HASH_CONFLICT')
+                repeated+=1
+            else:
+                evidence=source.render(rec)
+                png=evidence.pop('png')
+                image_key=store.evidence(sid,'page',png,'png')
+                current=store.commit(sid,'IN_PROGRESS','PAGE_LOCKED',extra={"image_key":image_key,"evidence":evidence})
+                commits+=1
+                if inject_interrupt_after==commits:raise InterruptedByTest('SYNTHETIC_KILL_AFTER_DURABLE_CHECKPOINT')
+            if current['stage']=='VISION_EXTRACTED':
+                raw_key=current['extra'].get('vision_key')
+                saved=store.objects.get(raw_key) if raw_key else None
+                if not saved: raise SourceError('VISION_CHECKPOINT_MISSING')
+                extracted=ExerciseDraft.model_validate_json(saved)
+            else:
+                extracted=extractor.extract(rec,png)
+                vision_key=store.save_draft(sid,extracted.model_dump())
+                current=store.commit(sid,'IN_PROGRESS','VISION_EXTRACTED',extra={"image_key":image_key,"evidence":evidence,"vision_key":vision_key})
+                commits+=1
+                if inject_interrupt_after==commits:raise InterruptedByTest('SYNTHETIC_KILL_AFTER_DURABLE_CHECKPOINT')
+            box=extracted.bbox_0_to_1000
+            # The evidence crop is only generated for plausible source coordinates.
+            crop_key=None;crop_hash=None
+            if len(box)==4 and 0<=box[0]<box[2]<=1000 and 0<=box[1]<box[3]<=1000:
+                crop=source.crop(png,box)
+                crop_hash=sha256_bytes(crop)
+                crop_key=store.evidence(sid,'crop',crop,'png')
+            q=make_question(rec,extracted,evidence,crop_hash)
+            q['source_crop_key']=crop_key
+            q['engine_candidate']=candidate_engine_payload(q)
+            q['qa']['n9_engine_browser_pass']=False
+            # Drafts have no release privileges; nonempty uncertainty always goes to review.
+            draft_key=store.save_draft(sid,q)
+            status='DRAFT_REVIEW_REQUIRED' if q['qa']['uncertainties'] else 'DRAFT_READY'
+            store.commit(sid,status,'DRAFT_SAVED',extra={"draft_key":draft_key,"source_crop_key":crop_key,
+                       "slots":q['slot_count'],"image_key":image_key,"evidence":evidence})
+            commits+=1
+        except InterruptedByTest: raise
+        except Exception as exc:
+            # Do not log untrusted source text, API replies, credentials or stack traces.
+            reason=classify_error(exc)
+            if reason in {'VISION_AUTH_FAILED','VISION_QUOTA_EXCEEDED','VISION_RATE_LIMIT','TRANSIENT_NETWORK_OR_TIMEOUT','VISION_NOT_CONFIGURED'}:
+                store.event(sid,'INFRASTRUCTURE_BLOCK','BLOCKED',reason)
+                raise RuntimeError('INFRASTRUCTURE_BLOCK:'+reason) from None
+            store.commit(sid,'EXCEPTION','PROCESSING_EXCEPTION',reason,extra={"source_page":rec.get('page',''),"bqa":rec.get('bqa','')})
+            commits+=1
+    summary=store.summary(len(rows))
+    summary.update({"this_invocation_processed":processed,"checkpoint_reused":repeated,
+                    "already_terminal_skipped":skipped,"commits_this_invocation":commits,
+                    "remaining":max(0,len(rows)-sum(summary['by_status'].get(s,0) for s in TERMINAL)),
+                    "run_type":"CONTENT_DRAFT_PIPELINE_NOT_RELEASE_APPROVAL"})
+    return summary
 
-def export_views(conn, state_dir: Path):
-    rows = conn.execute("SELECT source_id,lesson_id,bqa,status,reason,source_page,updated_at FROM records ORDER BY bqa,source_id").fetchall()
-    counts = {}
-    for row in rows:
-        counts[row[3]] = counts.get(row[3], 0) + 1
-    groups = {}
-    for row in rows:
-        group = row[2] or "UNKNOWN"
-        groups.setdefault(group, {"total": 0, "by_status": {}})
-        groups[group]["total"] += 1
-        s = row[3]
-        groups[group]["by_status"][s] = groups[group]["by_status"].get(s, 0) + 1
-    output = {"generated_at": utc_now(), "total": len(rows), "by_status": counts, "by_bqa": groups,
-              "source_verified": 0, "engine_ready": 0, "release_approved": 0,
-              "note": "Manifest traversal and metadata checks only. No content proof or release."}
-    tmp = state_dir / "summary.json.tmp"
-    tmp.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
-    tmp.replace(state_dir / "summary.json")
-    tmp_csv = state_dir / "exceptions.csv.tmp"
-    with tmp_csv.open("w", encoding="utf-8", newline="") as f:
-        w = csv.writer(f)
-        w.writerow(("source_id", "lesson_id", "bqa", "status", "reason", "pdf_page", "updated_at"))
-        w.writerows(rows)
-    tmp_csv.replace(state_dir / "exceptions.csv")
-    return output
+def setup_store(kind,state_dir,campaign,bucket=None,prefix='',endpoint=None,s3_client=None):
+    if kind=='s3': objects=S3Objects(bucket,prefix,endpoint,client=s3_client)
+    else: objects=LocalObjects(state_dir)
+    return AuditStore(objects,campaign)
 
-def execute(manifest: Path, state_dir: Path, retry: bool = False):
-    state_dir.mkdir(parents=True, exist_ok=True)
-    conn = connect(state_dir / "state.sqlite3")
-    try:
-        with manifest.open(encoding="utf-8-sig", newline="") as fp:
-            reader = csv.DictReader(fp)
-            if not reader.fieldnames or not set(REQUIRED).issubset(reader.fieldnames):
-                raise ValueError("Manifest missing columns: " + ", ".join(sorted(set(REQUIRED) - set(reader.fieldnames or []))))
-            seen = set()
-            for number, row in enumerate(reader, start=2):
-                source_id = str(row.get("source_id", "")).strip() or f"INVALID_ROW_{number}"
-                identity = digest(row)
-                if source_id in seen:
-                    status, reason = "SOURCE_CONFLICT", "DUPLICATE_SOURCE_ID_IN_INPUT"
-                else:
-                    status, reason = classify(row)
-                seen.add(source_id)
-                old = conn.execute("SELECT input_hash,status FROM records WHERE source_id=?", (source_id,)).fetchone()
-                if old and old[0] == identity and not retry:
-                    continue
-                event = {"source_id": source_id, "at": utc_now(), "event_type": "RECORD_CLASSIFIED",
-                         "input_hash": identity, "status": status, "reason": reason}
-                # Durable SQLite event/state transaction; JSONL is a secondary audit mirror.
-                with conn:
-                    conn.execute("""INSERT INTO records(source_id,lesson_id,bqa,input_hash,status,reason,source_page,updated_at)
-                       VALUES(?,?,?,?,?,?,?,?)
-                       ON CONFLICT(source_id) DO UPDATE SET lesson_id=excluded.lesson_id,
-                       bqa=excluded.bqa,input_hash=excluded.input_hash,status=excluded.status,
-                       reason=excluded.reason,source_page=excluded.source_page,updated_at=excluded.updated_at""",
-                       (source_id, row.get("lesson_id",""), row.get("owner_batch",""), identity,
-                        status, reason, row.get("pdf_page",""), event["at"]))
-                    conn.execute("INSERT INTO events(source_id,at,event_type,input_hash,status,reason) VALUES(?,?,?,?,?,?)",
-                                 (source_id, event["at"], event["event_type"], identity, status, reason))
-                append_event_jsonl(state_dir / "events.jsonl", event)
-        return export_views(conn, state_dir)
-    finally:
-        conn.close()
+def preflight(rows,source,store,vision_enabled):
+    if not vision_enabled: raise ValueError('OPENAI_API_KEY_OR_VISION_MODEL_NOT_CONFIGURED')
+    locks=source.verify_all(True)
+    # Live external read/write probe. No private page data or credentials are logged.
+    key=f'{store.root}/control/preflight.json'
+    payload=json.dumps({"at":now(),"schema":1}).encode()
+    store.objects.put(key,payload)
+    if store.objects.get(key)!=payload:raise RuntimeError('CHECKPOINT_REMOTE_READBACK_FAILED')
+    return {"ready":True,"source_rows":len(rows),"source_locks":len(locks),
+            "bqa_count":len({r['bqa'] for r in rows}),"external_readback":True}
 
 def main():
-    p = argparse.ArgumentParser()
-    p.add_argument("--manifest", required=True, type=Path)
-    p.add_argument("--state-dir", required=True, type=Path)
-    p.add_argument("--run-all", action="store_true", required=True)
-    p.add_argument("--retry", action="store_true")
-    a = p.parse_args()
-    result = execute(a.manifest, a.state_dir, a.retry)
-    print(json.dumps(result, ensure_ascii=False, indent=2))
-
-if __name__ == "__main__":
-    main()
+    p=argparse.ArgumentParser()
+    p.add_argument('--manifest',type=Path,required=True)
+    p.add_argument('--pdf-root',type=Path,required=True)
+    p.add_argument('--campaign',default='lop2-v2-campaign')
+    p.add_argument('--mode',choices=['preflight','run'],default='preflight')
+    p.add_argument('--store',choices=['s3','local'],default='s3')
+    p.add_argument('--state-dir',type=Path,default=Path('state'))
+    p.add_argument('--s3-bucket',default=os.getenv('LOP2_S3_BUCKET'))
+    p.add_argument('--s3-prefix',default=os.getenv('LOP2_S3_PREFIX','lop2'))
+    p.add_argument('--s3-endpoint',default=os.getenv('LOP2_S3_ENDPOINT'))
+    p.add_argument('--max-items',type=int,default=35)
+    p.add_argument('--max-seconds',type=int,default=15000)
+    p.add_argument('--expected-count',type=int,default=1406)
+    p.add_argument('--expected-bqas',type=int,default=21)
+    p.add_argument('--retry-exceptions',action='store_true')
+    p.add_argument('--summary-file',type=Path)
+    a=p.parse_args()
+    if a.max_items<1 or a.max_items>1406:raise ValueError('MAX_ITEMS_OUT_OF_RANGE')
+    rows=load_manifest(a.manifest,a.expected_count,a.expected_bqas)
+    source=SourceProcessor(a.pdf_root)
+    store=setup_store(a.store,a.state_dir,a.campaign,a.s3_bucket,a.s3_prefix,a.s3_endpoint)
+    model=os.getenv('LOP2_VISION_MODEL','')
+    enabled=bool(os.getenv('OPENAI_API_KEY') and model)
+    status=preflight(rows,source,store,enabled)
+    if a.mode=='run':
+        if os.getenv('LOP2_ALLOW_RUN')!='YES':raise ValueError('RUN_BLOCKED_LOP2_ALLOW_RUN_NOT_YES')
+        summary=run_pipeline(rows,source,store,VisionExtractor(model=model),a.max_items,a.max_seconds,a.retry_exceptions)
+        status.update(summary)
+    if a.summary_file:
+        a.summary_file.parent.mkdir(parents=True,exist_ok=True)
+        a.summary_file.write_text(json.dumps(status,ensure_ascii=False,indent=2),encoding='utf-8')
+    # Public CI logs only numeric stats; no original content, image, prompts or proposed answers.
+    print(json.dumps(status,ensure_ascii=False,indent=2))
+    return 0
+if __name__=='__main__':sys.exit(main())
