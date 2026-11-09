@@ -1,0 +1,33 @@
+name: LOP2 All-in-One Runner CI
+on:
+  pull_request:
+    paths:
+      - 'all-in-one-1406/**'
+      - '.github/workflows/lop2-all-in-one-ci.yml'
+      - '.github/workflows/lop2-all-in-one-production.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test-runner:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install --requirement all-in-one-1406/requirements.txt
+      - name: Unit tests; no private content and no API calls
+        run: python -m unittest discover -s all-in-one-1406/tests -v
+      - name: Ensure no book files or secrets are committed
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from subprocess import check_output
+          paths=check_output(['git','ls-files'],text=True).splitlines()
+          forbidden={'.pdf','.xlsx','.xls','.db','.sqlite3','.pem','.key','.jsonl'}
+          flagged=[p for p in paths if p.startswith('all-in-one-1406/') and Path(p).suffix.lower() in forbidden]
+          if flagged:raise SystemExit('PRIVATE_SOURCE_FILE_COMMITTED:'+repr(flagged))
+          print('Sensitive source binaries: none committed')
+          PY
