@@ -10,6 +10,8 @@ import json
 import os
 import sys
 import time
+import socket
+import urllib.error
 from pathlib import Path
 from source_processor import SourceProcessor, SourceError, sha256_bytes, sha256_file
 from question_builder import VisionExtractor, ExerciseDraft, BuildError, make_question
@@ -44,7 +46,11 @@ def load_manifest(path:Path,expected_count:int=1406,expected_bqas:int=21):
 
 def classify_error(exc):
     if isinstance(exc, (SourceError, BuildError)):return exc.code
-    if isinstance(exc, (TimeoutError, ConnectionError)):return 'TRANSIENT_NETWORK_OR_TIMEOUT'
+    if isinstance(exc, (TimeoutError, socket.timeout)):return 'VISION_REQUEST_TIMEOUT'
+    if isinstance(exc, urllib.error.URLError):
+        if isinstance(exc.reason, (TimeoutError, socket.timeout)):return 'VISION_REQUEST_TIMEOUT'
+        return 'VISION_TRANSPORT_ERROR'
+    if isinstance(exc, ConnectionError):return 'VISION_TRANSPORT_ERROR'
     message=str(exc).upper()
     if 'RATE_LIMIT' in message or '429' in message:return 'VISION_RATE_LIMIT'
     if 'INSUFFICIENT_QUOTA' in message:return 'VISION_QUOTA_EXCEEDED'
@@ -94,6 +100,8 @@ def run_pipeline(rows, source, store:AuditStore, extractor, max_items=35, max_se
                     print(f'[RESUME] {sid}: found {len(candidates)} valid vision snapshots; no safe automatic reuse', flush=True)
                     current=None
         processed+=1
+        item_started=time.monotonic()
+        print(f'[ITEM] {processed} {sid} start; previous={current["stage"] if current else "NEW"}',flush=True)
         try:
             if current and current['stage'] in ('PAGE_LOCKED','VISION_EXTRACTED'):
                 image_key=current['extra'].get('image_key')
@@ -137,12 +145,13 @@ def run_pipeline(rows, source, store:AuditStore, extractor, max_items=35, max_se
             status='DRAFT_REVIEW_REQUIRED' if q['qa']['uncertainties'] else 'DRAFT_READY'
             store.commit(sid,status,'DRAFT_SAVED',extra={"draft_key":draft_key,"source_crop_key":crop_key,
                        "slots":q['slot_count'],"image_key":image_key,"evidence":evidence})
+            print(f'[DRAFT] {sid} {status}; slots={q["slot_count"]}; elapsed={time.monotonic()-item_started:.1f}s',flush=True)
             commits+=1
         except InterruptedByTest: raise
         except Exception as exc:
             # Do not log untrusted source text, API replies, credentials or stack traces.
             reason=classify_error(exc)
-            if reason in {'VISION_AUTH_FAILED','VISION_QUOTA_EXCEEDED','VISION_RATE_LIMIT','TRANSIENT_NETWORK_OR_TIMEOUT','VISION_NOT_CONFIGURED'}:
+            if reason in {'VISION_AUTH_FAILED','VISION_QUOTA_EXCEEDED','VISION_RATE_LIMIT','VISION_NOT_CONFIGURED'}:
                 store.event(sid,'INFRASTRUCTURE_BLOCK','BLOCKED',reason)
                 raise RuntimeError('INFRASTRUCTURE_BLOCK:'+reason) from None
             # Preserve the most recent AI/image evidence pointer on failures,
@@ -151,6 +160,7 @@ def run_pipeline(rows, source, store:AuditStore, extractor, max_items=35, max_se
             preserved=(previous or {}).get('extra',{}).copy()
             preserved.update({"source_page":rec.get('page',''),"bqa":rec.get('bqa','')})
             store.commit(sid,'EXCEPTION','PROCESSING_EXCEPTION',reason,extra=preserved)
+            print(f'[EXCEPTION] {sid} {reason}; elapsed={time.monotonic()-item_started:.1f}s; continuing',flush=True)
             commits+=1
     summary=store.summary(len(rows))
     summary.update({"this_invocation_processed":processed,"checkpoint_reused":repeated,
