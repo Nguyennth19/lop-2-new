@@ -107,7 +107,7 @@ def make_question(record:dict, extraction:ExerciseDraft, evidence:dict, crop_has
             qa_flags.append("SLOT_ANSWER_UNRESOLVED:"+slot.slot_id)
             ready_answers=False
         if slot.answer_type=="NUMBER" and answer.lower() not in placeholders:
-            if not re.fullmatch(r"-?\\d+(?:[.,]\\d+)?",answer):
+            if not re.fullmatch(r"-?\d+(?:[.,]\d+)?",answer):
                 qa_flags.append("NUMBER_ANSWER_INVALID:"+slot.slot_id)
                 ready_answers=False
         if slot.arithmetic_expression:
