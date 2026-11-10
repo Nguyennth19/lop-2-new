@@ -39,9 +39,12 @@ class WindowsTests(unittest.TestCase):
             evidence=s.evidence('a','page',b'hello world')
             s.commit('a','IN_PROGRESS','PAGE_LOCKED',extra={'image_key':evidence})
             backup_files(s,Path(t)/'backup')
-            with sqlite3.connect(Path(t)/'backup'/'checkpoint.sqlite3') as c:
+            c=sqlite3.connect(Path(t)/'backup'/'checkpoint.sqlite3')
+            try:
                 self.assertEqual(c.execute('PRAGMA integrity_check').fetchone()[0],'ok')
                 self.assertEqual(c.execute('SELECT COUNT(*) FROM states').fetchone()[0],1)
+            finally:
+                c.close()  # Required on Windows to release file locks.
             self.assertEqual((Path(t)/'backup'/'objects'/evidence).read_bytes(),b'hello world')
             self.assertEqual(len((Path(t)/'backup'/'events.jsonl').read_text().splitlines()),1)
             s.close()
