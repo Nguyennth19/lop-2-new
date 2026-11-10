@@ -1,0 +1,10 @@
+PRIVATE_INPUTS/
+LOCAL_STATE/
+BACKUPS/
+*.pdf
+*.csv
+*.sqlite3*
+*.jsonl
+.env
+.venv/
+__pycache__/
