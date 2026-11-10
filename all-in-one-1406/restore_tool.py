@@ -19,8 +19,11 @@ backup=a.backup_dir.resolve(); state=a.state_dir.resolve()
 if state==backup or state in backup.parents or backup in state.parents:raise SystemExit('BACKUP_STATE_PATH_OVERLAP')
 source_db=backup/'checkpoint.sqlite3'
 if not source_db.is_file():raise SystemExit('BACKUP_DATABASE_MISSING')
-with sqlite3.connect(str(source_db)) as test:
+test=sqlite3.connect(str(source_db))
+try:
     if test.execute('PRAGMA integrity_check').fetchone()[0]!='ok':raise SystemExit('BACKUP_CORRUPTED')
+finally:
+    test.close()  # Windows requires an explicit close before filesystem replacement.
 if not (backup/'objects').is_dir():raise SystemExit('BACKUP_EVIDENCE_MISSING')
 state.mkdir(parents=True,exist_ok=True)
 with exclusive_run_lock(state):
