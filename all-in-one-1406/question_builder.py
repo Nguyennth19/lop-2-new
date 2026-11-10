@@ -89,19 +89,33 @@ def make_question(record:dict, extraction:ExerciseDraft, evidence:dict, crop_has
     if not extraction.found: raise BuildError("EXERCISE_NOT_FOUND_ON_PAGE")
     if not extraction.identity_confident: raise BuildError("SOURCE_TO_EXERCISE_MAPPING_AMBIGUOUS")
     box=extraction.bbox_0_to_1000
-    if len(box)!=4 or not (0<=box[0]<box[2]<=1000 and 0<=box[1]<box[3]<=1000):
-        raise BuildError("BBOX_INVALID")
+    # A model's malformed crop rectangle must NOT become fabricated coordinates.
+    # Preserve the unapproved draft without a crop, and flag it for review.
+    bbox_valid = len(box)==4 and (0<=box[0]<box[2]<=1000 and 0<=box[1]<box[3]<=1000)
     if not extraction.verbatim_prompt.strip(): raise BuildError("PROMPT_NOT_READABLE")
     if not extraction.student_slots: raise BuildError("NO_STUDENT_SLOTS_LOCATED")
     ids=[s.slot_id for s in extraction.student_slots]
     if len(ids)!=len(set(ids)) or any(not x.strip() for x in ids): raise BuildError("SLOT_IDS_INVALID_OR_DUPLICATE")
     checks=[]
+    qa_flags=list(extraction.uncertainties)+list(extraction.unresolved_visuals)
+    ready_answers=True
     for slot in extraction.student_slots:
         if not slot.observed_blank: raise BuildError("SLOT_NOT_SHOWN_IN_SOURCE")
-        if not slot.proposed_answer.strip(): raise BuildError("SLOT_ANSWER_UNRESOLVED")
+        answer=slot.proposed_answer.strip()
+        placeholders={"", "?", "？", "??", "...", "…", "unknown", "n/a", "none", "null", "chưa rõ", "không rõ"}
+        if answer.lower() in placeholders:
+            qa_flags.append("SLOT_ANSWER_UNRESOLVED:"+slot.slot_id)
+            ready_answers=False
+        if slot.answer_type=="NUMBER" and answer.lower() not in placeholders:
+            if not re.fullmatch(r"-?\d+(?:[.,]\d+)?",answer):
+                qa_flags.append("NUMBER_ANSWER_INVALID:"+slot.slot_id)
+                ready_answers=False
         if slot.arithmetic_expression:
             computed=calculate_basic(slot.arithmetic_expression)
-            if computed is not None and slot.answer_type=="NUMBER" and computed!=slot.proposed_answer.strip():
+            if computed is None:
+                qa_flags.append("ARITHMETIC_EXPRESSION_UNVERIFIABLE:"+slot.slot_id)
+                ready_answers=False
+            elif slot.answer_type=="NUMBER" and answer.lower() not in placeholders and computed!=answer:
                 raise BuildError("ARITHMETIC_ANSWER_CONFLICT")
             checks.append({"slot_id":slot.slot_id,"expression":slot.arithmetic_expression,"independent_result":computed})
     return {
@@ -112,13 +126,13 @@ def make_question(record:dict, extraction:ExerciseDraft, evidence:dict, crop_has
        "student_slots":[s.model_dump() for s in extraction.student_slots],
        "slot_count":len(extraction.student_slots),"worked_example_summary":extraction.worked_example_summary,
        "figure_dependency":extraction.figures_required,
-       "source_crop_bbox":box,"source_crop_sha256":crop_hash,
+       "source_crop_bbox":box if bbox_valid else None,"source_crop_sha256":crop_hash if bbox_valid else None,
        "evidence":{"pdf_sha256":evidence["pdf_sha256"],"page_image_sha256":evidence["image_sha256"],
                    "crop_sha256":crop_hash,"source_file":evidence["pdf_file"]},
        "mapping_rationale":extraction.match_rationale,
        "qa":{"extraction_method":"AI_VISION_DRAFT","source_text_independently_certified":False,
              "all_slots_independently_certified":False,"source_to_id_independently_verified":False,
-             "math_cross_checks":checks,"uncertainties":extraction.uncertainties+extraction.unresolved_visuals,
+             "math_cross_checks":checks,"answer_key_ready":ready_answers,"uncertainties":qa_flags+([] if bbox_valid else ["SOURCE_BBOX_INVALID_REQUIRES_REVIEW"]),
              "n9_engine_browser_pass":False,"n10_reviewer_signed":False,"n12_release_allowed":False},
        "release_allowed":False,
     }
