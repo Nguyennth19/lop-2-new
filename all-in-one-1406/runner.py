@@ -61,7 +61,31 @@ def run_pipeline(rows, source, store:AuditStore, extractor, max_items=35, max_se
         current=store.load(sid)
         if current and current['status'] in TERMINAL and not (retry_exceptions and current['status']=='EXCEPTION'):
             skipped+=1; continue
-        if current and current['status']=='EXCEPTION' and retry_exceptions: current=None
+        if current and current['status']=='EXCEPTION' and retry_exceptions:
+            # A previous error may have overwritten the stage pointer while
+            # leaving a successful Vision extraction safely in immutable objects.
+            # Reuse it only when EXACTLY one valid extraction exists for this ID.
+            extra=current.get('extra',{})
+            if extra.get('vision_key') and extra.get('image_key') and extra.get('evidence'):
+                current={'stage':'VISION_EXTRACTED','extra':extra,'status':'IN_PROGRESS'}
+            else:
+                prefix=f'{store.root}/drafts/{store.key(sid)}-'
+                candidates=[]
+                for key in store.objects.list(prefix):
+                    try:
+                        value=ExerciseDraft.model_validate_json(store.objects.get(key))
+                        candidates.append((key,value))
+                    except Exception:
+                        pass
+                if len(candidates)==1:
+                    evidence=source.render(rec)
+                    png=evidence.pop('png')
+                    image_key=store.evidence(sid,'page',png,'png')
+                    current=store.commit(sid,'IN_PROGRESS','VISION_EXTRACTED',
+                                         extra={'image_key':image_key,'evidence':evidence,
+                                                'vision_key':candidates[0][0]})
+                else:
+                    current=None
         processed+=1
         try:
             if current and current['stage'] in ('PAGE_LOCKED','VISION_EXTRACTED'):
@@ -114,7 +138,12 @@ def run_pipeline(rows, source, store:AuditStore, extractor, max_items=35, max_se
             if reason in {'VISION_AUTH_FAILED','VISION_QUOTA_EXCEEDED','VISION_RATE_LIMIT','TRANSIENT_NETWORK_OR_TIMEOUT','VISION_NOT_CONFIGURED'}:
                 store.event(sid,'INFRASTRUCTURE_BLOCK','BLOCKED',reason)
                 raise RuntimeError('INFRASTRUCTURE_BLOCK:'+reason) from None
-            store.commit(sid,'EXCEPTION','PROCESSING_EXCEPTION',reason,extra={"source_page":rec.get('page',''),"bqa":rec.get('bqa','')})
+            # Preserve the most recent AI/image evidence pointer on failures,
+            # so a retry can rebuild without another expensive vision inference.
+            previous=store.load(sid)
+            preserved=(previous or {}).get('extra',{}).copy()
+            preserved.update({"source_page":rec.get('page',''),"bqa":rec.get('bqa','')})
+            store.commit(sid,'EXCEPTION','PROCESSING_EXCEPTION',reason,extra=preserved)
             commits+=1
     summary=store.summary(len(rows))
     summary.update({"this_invocation_processed":processed,"checkpoint_reused":repeated,
