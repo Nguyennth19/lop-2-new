@@ -89,8 +89,9 @@ def make_question(record:dict, extraction:ExerciseDraft, evidence:dict, crop_has
     if not extraction.found: raise BuildError("EXERCISE_NOT_FOUND_ON_PAGE")
     if not extraction.identity_confident: raise BuildError("SOURCE_TO_EXERCISE_MAPPING_AMBIGUOUS")
     box=extraction.bbox_0_to_1000
-    if len(box)!=4 or not (0<=box[0]<box[2]<=1000 and 0<=box[1]<box[3]<=1000):
-        raise BuildError("BBOX_INVALID")
+    # A model's malformed crop rectangle must NOT become fabricated coordinates.
+    # Preserve the unapproved draft without a crop, and flag it for review.
+    bbox_valid = len(box)==4 and (0<=box[0]<box[2]<=1000 and 0<=box[1]<box[3]<=1000)
     if not extraction.verbatim_prompt.strip(): raise BuildError("PROMPT_NOT_READABLE")
     if not extraction.student_slots: raise BuildError("NO_STUDENT_SLOTS_LOCATED")
     ids=[s.slot_id for s in extraction.student_slots]
@@ -112,13 +113,13 @@ def make_question(record:dict, extraction:ExerciseDraft, evidence:dict, crop_has
        "student_slots":[s.model_dump() for s in extraction.student_slots],
        "slot_count":len(extraction.student_slots),"worked_example_summary":extraction.worked_example_summary,
        "figure_dependency":extraction.figures_required,
-       "source_crop_bbox":box,"source_crop_sha256":crop_hash,
+       "source_crop_bbox":box if bbox_valid else None,"source_crop_sha256":crop_hash if bbox_valid else None,
        "evidence":{"pdf_sha256":evidence["pdf_sha256"],"page_image_sha256":evidence["image_sha256"],
                    "crop_sha256":crop_hash,"source_file":evidence["pdf_file"]},
        "mapping_rationale":extraction.match_rationale,
        "qa":{"extraction_method":"AI_VISION_DRAFT","source_text_independently_certified":False,
              "all_slots_independently_certified":False,"source_to_id_independently_verified":False,
-             "math_cross_checks":checks,"uncertainties":extraction.uncertainties+extraction.unresolved_visuals,
+             "math_cross_checks":checks,"uncertainties":extraction.uncertainties+extraction.unresolved_visuals+([] if bbox_valid else ["SOURCE_BBOX_INVALID_REQUIRES_REVIEW"]),
              "n9_engine_browser_pass":False,"n10_reviewer_signed":False,"n12_release_allowed":False},
        "release_allowed":False,
     }
