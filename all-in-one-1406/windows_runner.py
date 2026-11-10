@@ -4,7 +4,6 @@ Does not claim source validation/release. Full scan requires local Ollama vision
 """
 import argparse
 import csv
-import csv
 import json
 import os
 from pathlib import Path
@@ -29,8 +28,18 @@ def export_reports(store,state_dir):
         for row in store.states():
             writer.writerow((row["source_id"],row["stage"],row["status"],row.get("reason_code",""),row.get("updated_at",""),row.get("extra",{}).get("draft_key","")))
         f.flush();os.fsync(f.fileno())
-    os.replace(tmp,path)
-    store.journal_export(state_dir/"events.jsonl")
+    try:
+        os.replace(tmp,path)
+    except PermissionError:
+        # Excel on Windows locks the live CSV. SQLite remains authoritative.
+        # Keep a separate report, and never abort all source processing.
+        alternate=state_dir/("records_snapshot_"+uuid.uuid4().hex[:8]+".csv")
+        os.replace(tmp,alternate)
+        print(f'[REPORT] Excel locked records.csv; wrote alternate {alternate.name}',flush=True)
+    try:
+        store.journal_export(state_dir/"events.jsonl")
+    except PermissionError:
+        print('[REPORT] events.jsonl is locked; SQLite event journal is intact',flush=True)
 
 def backup_files(store,backup_root,copy_blobs=True):
     """Consistent SQLite snapshot + read-only immutable evidence blobs copied incrementally.
@@ -66,6 +75,8 @@ def execute(args, extractor_override=None, source_override=None, inject_interrup
               'source_pdfs':{k:v['sha256'] for k,v in verified.items()}}
         store.lock_inputs(lock)
         if store.integrity()!='ok':raise RuntimeError('STATE_SQLITE_CORRUPTED')
+        if not extractor_override:
+            os.environ['LOP2_HEARTBEAT_FILE']=str(Path(args.state_dir).resolve()/'heartbeat.json')
         extractor=extractor_override or OllamaExtractor(model=args.model,endpoint=args.ollama_url)
         status={'campaign':args.campaign,'input_records':len(rows),'bqas':len({x['bqa'] for x in rows}),
                 'source_pdfs':len(verified),'source_manifest_sha256':lock['manifest_sha256'],
@@ -81,6 +92,7 @@ def execute(args, extractor_override=None, source_override=None, inject_interrup
             for start in range(0,len(candidates),args.chunk_size):
                 if done>=max_items:break
                 chunk=candidates[start:start+min(args.chunk_size,max_items-done)]
+                print(f'[BATCH] items {start+1}..{start+len(chunk)} of {len(candidates)}; checkpoint each stage',flush=True)
                 result=run_pipeline(chunk,source,store,extractor,max_items=len(chunk),max_seconds=args.max_seconds,
                                     retry_exceptions=args.retry_exceptions,inject_interrupt_after=inject_interrupt_after)
                 done+=len(chunk)
