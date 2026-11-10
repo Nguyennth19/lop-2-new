@@ -53,3 +53,18 @@ A process-level lock refuses two concurrent runner executions. Evidence files ar
 - `LOCAL_STATE/records.csv`: current status for every **attempted** source ID (`DRAFT_READY`, `DRAFT_REVIEW_REQUIRED`, `EXCEPTION`, or in-progress). This is a derived report regenerated after each 5-item chunk, not the transaction journal.
 - `LOCAL_STATE/events.jsonl`: chronological append-only event **export** regenerated from the authoritative SQLite event table after each chunk.
 - Even if a process is killed between chunk exports, `checkpoint.sqlite3` retains the last completed per-stage transaction and will regenerate the reports at the next checkpoint.
+
+## Next action on the owner's Windows PC: hardware readiness and true source canary
+
+This updated delivery also includes `CHECK_PC.bat`, `RUN_CANARY.bat` and `all-in-one-1406/pc_readiness.py`.
+
+**Recommended sequence (do not start `RUN_ALL.bat` before the canary is inspected):**
+
+1. Extract both ZIPs **into the same folder**. Install Python 3.11+ and Ollama for Windows. On PowerShell, run `ollama pull qwen2.5vl:7b` (Ollama model library lists this as a vision-enabled ~6 GB model).
+2. Run `CHECK_PC.bat`. It generates `LOCAL_STATE/pc_readiness.json`, checking Windows/Python, physical RAM, GPU model names (not GPU memory), SSD free capacity, five private source filenames and whether Ollama has the selected model available at `127.0.0.1:11434`. It never reads the PDF text or uploads any private document. It requires **20 GB free as a starting threshold**; actual disk use may be much higher depending on image/backup retention.
+3. Run `CHECK_ONLY.bat` to verify the **contents**: all 1,406 rows, 21 BQA and the four PDF SHA-256 locks. Merely having five files in the folder is not sufficient.
+4. Run `RUN_CANARY.bat`. This performs a real local Ollama call for **one original source candidate** `SGK_B001_K1_E01` and saves its image/extraction/draft/exception with durable SQLite checkpoints.
+5. Inspect `LOCAL_STATE/records.csv` for the canary ID and the JSON/visual evidence in `LOCAL_STATE/objects/`. A zero exit code means the canary procedure finished, **not** that its content is approved. If it ends in `EXCEPTION` or `DRAFT_REVIEW_REQUIRED`, troubleshoot the source/model before starting the full batch.
+6. Only after examining that record, run `RUN_ALL.bat` once; rerun the same file after interruption. All 1,406 source candidates remain subject to fail-closed QA; none will be auto-signed N9/N10/N12.
+
+The updated hardware checker does not know your machine's GPU until run on your Windows PC. Do not upload hardware reports to public GitHub unless you have reviewed them.
