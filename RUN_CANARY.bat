@@ -12,8 +12,12 @@ if not exist "%APP%\.venv\Scripts\python.exe" (
   echo ERROR: first run CHECK_ONLY.bat to set up Python dependencies.
   pause & exit /b 2
 )
-"%APP%\.venv\Scripts\python.exe" "%APP%\pc_readiness.py" --root "%~dp0" --model "%MODEL%" --report "%STATE%\pc_readiness.json"
-if errorlevel 1 (echo PC READINESS FAILED. & pause & exit /b 2)
+"%APP%\.venv\Scripts\python.exe" "%APP%\pc_readiness.py" --root "%CD%" --model "%MODEL%" --report "%STATE%\pc_readiness.json"
+if errorlevel 1 (
+  echo PC READINESS FAILED. Check the resolved source directory shown above.
+  echo Expected source files under: "%INPUT%"
+  pause & exit /b 2
+)
 "%APP%\.venv\Scripts\python.exe" "%APP%\windows_runner.py" --input-dir "%INPUT%" --state-dir "%STATE%" --backup-dir "%BACKUP%" --mode preflight --status-file "%STATE%\summary.json"
 if errorlevel 1 (echo SOURCE PREFLIGHT FAILED. & pause & exit /b 3)
 echo.
