@@ -14,16 +14,15 @@ if exist "%APP%\.venv\Scripts\python.exe" (
   set "PYEXE="
 )
 if defined PYEXE (
-  "%PYEXE%" "%APP%\pc_readiness.py" --root "%~dp0" --model "%MODEL%" --report "%STATE%\pc_readiness.json"
+  "%PYEXE%" "%APP%\pc_readiness.py" --root "%CD%" --model "%MODEL%" --report "%STATE%\pc_readiness.json"
 ) else (
-  %PYTHON% "%APP%\pc_readiness.py" --root "%~dp0" --model "%MODEL%" --report "%STATE%\pc_readiness.json"
+  %PYTHON% "%APP%\pc_readiness.py" --root "%CD%" --model "%MODEL%" --report "%STATE%\pc_readiness.json"
 )
 set "RC=%ERRORLEVEL%"
 if not "%RC%"=="0" (
   echo.
   echo NOT READY. Read LOCAL_STATE\pc_readiness.json and resolve missing requirements.
-  echo Install Ollama: https://ollama.com/download/windows
-  echo Then run: ollama pull %MODEL%
+  echo Review the checks above. Only install Ollama if the ollama check is BLOCKED.
 ) else (
   echo.
   echo PC READY for source verification and one-item canary.
