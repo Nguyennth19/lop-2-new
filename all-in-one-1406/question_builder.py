@@ -97,12 +97,25 @@ def make_question(record:dict, extraction:ExerciseDraft, evidence:dict, crop_has
     ids=[s.slot_id for s in extraction.student_slots]
     if len(ids)!=len(set(ids)) or any(not x.strip() for x in ids): raise BuildError("SLOT_IDS_INVALID_OR_DUPLICATE")
     checks=[]
+    qa_flags=list(extraction.uncertainties)+list(extraction.unresolved_visuals)
+    ready_answers=True
     for slot in extraction.student_slots:
         if not slot.observed_blank: raise BuildError("SLOT_NOT_SHOWN_IN_SOURCE")
-        if not slot.proposed_answer.strip(): raise BuildError("SLOT_ANSWER_UNRESOLVED")
+        answer=slot.proposed_answer.strip()
+        placeholders={"", "?", "？", "??", "...", "…", "unknown", "n/a", "none", "null", "chưa rõ", "không rõ"}
+        if answer.lower() in placeholders:
+            qa_flags.append("SLOT_ANSWER_UNRESOLVED:"+slot.slot_id)
+            ready_answers=False
+        if slot.answer_type=="NUMBER" and answer.lower() not in placeholders:
+            if not re.fullmatch(r"-?\\d+(?:[.,]\\d+)?",answer):
+                qa_flags.append("NUMBER_ANSWER_INVALID:"+slot.slot_id)
+                ready_answers=False
         if slot.arithmetic_expression:
             computed=calculate_basic(slot.arithmetic_expression)
-            if computed is not None and slot.answer_type=="NUMBER" and computed!=slot.proposed_answer.strip():
+            if computed is None:
+                qa_flags.append("ARITHMETIC_EXPRESSION_UNVERIFIABLE:"+slot.slot_id)
+                ready_answers=False
+            elif slot.answer_type=="NUMBER" and answer.lower() not in placeholders and computed!=answer:
                 raise BuildError("ARITHMETIC_ANSWER_CONFLICT")
             checks.append({"slot_id":slot.slot_id,"expression":slot.arithmetic_expression,"independent_result":computed})
     return {
@@ -119,7 +132,7 @@ def make_question(record:dict, extraction:ExerciseDraft, evidence:dict, crop_has
        "mapping_rationale":extraction.match_rationale,
        "qa":{"extraction_method":"AI_VISION_DRAFT","source_text_independently_certified":False,
              "all_slots_independently_certified":False,"source_to_id_independently_verified":False,
-             "math_cross_checks":checks,"uncertainties":extraction.uncertainties+extraction.unresolved_visuals+([] if bbox_valid else ["SOURCE_BBOX_INVALID_REQUIRES_REVIEW"]),
+             "math_cross_checks":checks,"answer_key_ready":ready_answers,"uncertainties":qa_flags+([] if bbox_valid else ["SOURCE_BBOX_INVALID_REQUIRES_REVIEW"]),
              "n9_engine_browser_pass":False,"n10_reviewer_signed":False,"n12_release_allowed":False},
        "release_allowed":False,
     }
