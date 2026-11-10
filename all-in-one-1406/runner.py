@@ -71,13 +71,19 @@ def run_pipeline(rows, source, store:AuditStore, extractor, max_items=35, max_se
             else:
                 prefix=f'{store.root}/drafts/{store.key(sid)}-'
                 candidates=[]
-                for key in store.objects.list(prefix):
+                # LocalObjects.list() walks directories, not a filename prefix.
+                # List the drafts directory, then filter names to this source ID.
+                draft_dir=f'{store.root}/drafts/'
+                for key in store.objects.list(draft_dir):
+                    if not key.startswith(prefix):
+                        continue
                     try:
                         value=ExerciseDraft.model_validate_json(store.objects.get(key))
                         candidates.append((key,value))
                     except Exception:
                         pass
                 if len(candidates)==1:
+                    print(f'[RESUME] {sid}: reusing persisted VISION_EXTRACTED without Ollama call', flush=True)
                     evidence=source.render(rec)
                     png=evidence.pop('png')
                     image_key=store.evidence(sid,'page',png,'png')
@@ -85,6 +91,7 @@ def run_pipeline(rows, source, store:AuditStore, extractor, max_items=35, max_se
                                          extra={'image_key':image_key,'evidence':evidence,
                                                 'vision_key':candidates[0][0]})
                 else:
+                    print(f'[RESUME] {sid}: found {len(candidates)} valid vision snapshots; no safe automatic reuse', flush=True)
                     current=None
         processed+=1
         try:
